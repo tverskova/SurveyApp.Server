@@ -1,0 +1,171 @@
+﻿@page "/admin/statistics"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.Statistics
+@using SurveyApp.Server.Services.Interfaces
+@inject IStatisticsService StatisticsService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Статистика системы</PageTitle>
+
+<h3 class="mb-4">Статистика системы</h3>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (statistics is null)
+{
+    <div class="alert alert-warning">Статистика недоступна.</div>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">Пользователи</div>
+                    <div class="fs-3 fw-bold">@statistics.TotalUsers</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">Всего опросов</div>
+                    <div class="fs-3 fw-bold">@statistics.TotalSurveys</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">Опубликованные</div>
+                    <div class="fs-3 fw-bold">@statistics.PublishedSurveys</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">Всего прохождений</div>
+                    <div class="fs-3 fw-bold">@statistics.TotalResponses</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h5 class="mb-0">Опросы</h5>
+
+                <input class="form-control"
+                       style="max-width: 320px;"
+                       placeholder="Поиск по названию..."
+                       @bind="searchText" />
+            </div>
+
+            @if (FilteredSurveys.Count == 0)
+            {
+                <p class="text-muted mb-0">Опросы не найдены.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Статус</th>
+                                <th>Прохождения</th>
+                                <th class="text-end">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var survey in FilteredSurveys)
+                            {
+                                <tr>
+                                    <td>@survey.Title</td>
+                                    <td>
+                                        @if (survey.IsPublished)
+                                        {
+                                            <span class="badge bg-success">Опубликован</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Черновик</span>
+                                        }
+                                    </td>
+                                    <td>@survey.ResponsesCount</td>
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm"
+                                                @onclick="@(() => OpenSurveyResults(survey.SurveyId))">
+                                            Аналитика
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private SystemStatisticsDto? statistics;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string searchText = string.Empty;
+
+    private List<SystemSurveyStatisticsItemDto> FilteredSurveys =>
+        statistics?.Surveys
+            .Where(s => string.IsNullOrWhiteSpace(searchText)
+                || s.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .ToList()
+        ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            statistics = await StatisticsService.GetSystemStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке статистики: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenSurveyResults(int surveyId)
+    {
+        NavigationManager.NavigateTo($"/admin/results/{surveyId}?from=system");
+    }
+}

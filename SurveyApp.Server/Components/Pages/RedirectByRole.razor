@@ -1,0 +1,37 @@
+﻿@page "/redirect-by-role"
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize]
+
+<p>Перенаправление...</p>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            if (user.IsInRole("Admin"))
+            {
+                NavigationManager.NavigateTo("/admin", true);
+            }
+            else if (user.IsInRole("User"))
+            {
+                NavigationManager.NavigateTo("/user-home", true);
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/", true);
+            }
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/Account/Login", true);
+        }
+    }
+}

@@ -1,0 +1,96 @@
+﻿@page "/user-home"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.Surveys
+@using SurveyApp.Server.Services.Interfaces
+@inject ISurveyService SurveyService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "User,Admin")]
+
+<PageTitle>Опросы</PageTitle>
+
+<h3>Доступные опросы</h3>
+
+@if (isLoading)
+{
+    <p>Загрузка опросов...</p>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (surveys.Count == 0)
+{
+    <p>Сейчас нет опубликованных опросов.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var survey in surveys)
+        {
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@survey.Title</h5>
+                        <p class="card-text">@survey.Description</p>
+
+                        <p class="mb-1">
+                            <strong>Анонимный:</strong> @(survey.IsAnonymous ? "Да" : "Нет")
+                        </p>
+                        <p class="mb-1">
+                            <strong>Дата начала:</strong> @FormatDate(survey.StartDate)
+                        </p>
+                        <p class="mb-3">
+                            <strong>Дата окончания:</strong> @FormatDate(survey.EndDate)
+                        </p>
+
+                        <button class="btn btn-primary"
+                                @onclick="() => OpenSurvey(survey.Id)">
+                            Пройти опрос
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<SurveyListItemDto> surveys = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSurveys();
+    }
+
+    private async Task LoadSurveys()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            surveys = await SurveyService.GetPublishedSurveysAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке опросов: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenSurvey(int surveyId)
+    {
+        NavigationManager.NavigateTo($"/survey/{surveyId}");
+    }
+
+    private string FormatDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "-";
+    }
+}

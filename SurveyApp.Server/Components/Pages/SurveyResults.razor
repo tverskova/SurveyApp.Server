@@ -1,0 +1,198 @@
+﻿@page "/admin/results/{SurveyId:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@using SurveyApp.Server.DTOs.Statistics
+@using SurveyApp.Server.Services.Interfaces
+@inject IStatisticsService StatisticsService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Результаты опроса</PageTitle>
+
+<button class="btn btn-outline-secondary mb-3"
+        @onclick="GoBack">
+    ← Назад
+</button>
+
+@if (isLoading)
+{
+    <div class="spinner-border"></div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (statistics is null)
+{
+    <div class="alert alert-warning">Опрос не найден</div>
+}
+else
+{
+    <h3>@statistics.Title</h3>
+    <p class="text-muted">Всего прохождений: @statistics.TotalResponses</p>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted">Среднее время</div>
+                    <div class="fw-bold">
+                        @(statistics.AverageCompletionTimeSeconds > 0
+                                            ? $"{Math.Round(statistics.AverageCompletionTimeSeconds)} сек."
+                                            : "—")
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted">Первый ответ</div>
+                    <div class="fw-bold">
+                        @(statistics.FirstResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted">Последний ответ</div>
+                    <div class="fw-bold">
+                        @(statistics.LastResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    @for (int i = 0; i < statistics.Questions.Count; i++)
+    {
+        var question = statistics.Questions[i];
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-body">
+
+                <h5>@(i + 1). @question.Text</h5>
+
+                @if (question.Type == "Text")
+                {
+                    if (question.TextAnswers.Count == 0)
+                    {
+                        <p class="text-muted">Нет ответов</p>
+                    }
+                    else
+                    {
+                        <ul>
+                            @foreach (var text in question.TextAnswers)
+                            {
+                                <li>@text</li>
+                            }
+                        </ul>
+                    }
+                }
+                else
+                {
+                    <div style="max-width: 700px; height: 300px;">
+                        <canvas id="chart_@question.Id"></canvas>
+                    </div>
+
+                    @if (question.AverageValue.HasValue)
+                    {
+                        <div class="mt-2 text-muted small">
+                            Среднее: @question.AverageValue:F2
+                            @if (question.MinValue.HasValue && question.MaxValue.HasValue)
+                            {
+                                <span>
+                                    | Мин: @question.MinValue | Макс: @question.MaxValue
+                                </span>
+                            }
+                        </div>
+                    }
+                }
+
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int SurveyId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? From { get; set; }
+
+    private SurveyStatisticsDto? statistics;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || statistics == null)
+            return;
+
+        foreach (var question in statistics.Questions)
+        {
+            if (question.Type == "Text")
+                continue;
+
+            await JS.InvokeVoidAsync("renderChart",
+                $"chart_{question.Id}",
+                question.Labels,
+                question.Values,
+                GetChartType(question.Type));
+        }
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            isLoading = true;
+            statistics = await StatisticsService.GetSurveyStatisticsAsync(SurveyId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetChartType(string type)
+    {
+        return type switch
+        {
+            "SingleChoice" => "bar",
+            "MultipleChoice" => "bar",
+            "YesNo" => "pie",
+            "Rating" => "bar",
+            "Number" => "bar",
+            _ => "bar"
+        };
+    }
+
+    private void GoBack()
+    {
+        if (string.Equals(From, "system", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/admin/statistics");
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin");
+    }
+}

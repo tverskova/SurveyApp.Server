@@ -1,0 +1,235 @@
+﻿@page "/admin"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.Surveys
+@using SurveyApp.Server.Services.Interfaces
+@inject ISurveyService SurveyService
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Админ панель</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<h3>Административная панель</h3>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="GoToCreateSurvey">
+        Создать опрос
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <p>Загрузка опросов...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (surveys.Count == 0)
+{
+    <p>Опросов пока нет.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Название</th>
+                <th>Описание</th>
+                <th>Опубликован</th>
+                <th>Анонимный</th>
+                <th>Дата начала</th>
+                <th>Дата окончания</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var survey in surveys)
+            {
+                <tr>
+                    <td>@survey.Id</td>
+                    <td>@survey.Title</td>
+                    <td>@survey.Description</td>
+                    <td>@(survey.IsPublished ? "Да" : "Нет")</td>
+                    <td>@(survey.IsAnonymous ? "Да" : "Нет")</td>
+                    <td>@FormatDate(survey.StartDate)</td>
+                    <td>@FormatDate(survey.EndDate)</td>
+                    <td>
+                        @if (!survey.IsPublished)
+                        {
+                            <button class="btn btn-success btn-sm me-2"
+                                    @onclick="() => PublishSurvey(survey.Id)">
+                                Опубликовать
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-warning btn-sm me-2"
+                                    @onclick="() => HideSurvey(survey.Id)">
+                                Скрыть
+                            </button>
+                        }
+
+                        <button class="btn btn-primary btn-sm me-2"
+                                @onclick="() => EditSurvey(survey.Id)">
+                            Редактировать
+                        </button>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => DeleteSurvey(survey.Id)">
+                            Удалить
+                        </button>
+
+                        <button class="btn btn-outline-primary btn-sm me-2"
+                                @onclick="() => OpenResults(survey.Id)">
+                            Результаты
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Message { get; set; }
+
+    private string? successMessage;
+
+    private List<SurveyListItemDto> surveys = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Message == "saved")
+            successMessage = "Опрос сохранён.";
+        else if (Message == "updated")
+            successMessage = "Опрос обновлён.";
+        else if (Message == "deleted")
+            successMessage = "Опрос удалён.";
+        else if (Message == "hidden")
+            successMessage = "Опрос скрыт.";
+        else if (Message == "published")
+            successMessage = "Опрос опубликован.";
+
+        await LoadSurveys();
+    }
+
+    private async Task LoadSurveys()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            surveys = await SurveyService.GetAllSurveysAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке опросов: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToCreateSurvey()
+    {
+        NavigationManager.NavigateTo("/admin/create-survey");
+    }
+
+    private async Task PublishSurvey(int surveyId)
+    {
+        try
+        {
+            var result = await SurveyService.PublishSurveyAsync(surveyId);
+
+            if (!result)
+            {
+                errorMessage = "Не удалось опубликовать опрос.";
+                return;
+            }
+
+            successMessage = "Опрос опубликован.";
+            await LoadSurveys();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при публикации: {ex.Message}";
+        }
+    }
+
+    private string FormatDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("dd.MM.yyyy HH:mm") : "-";
+    }
+
+    private async Task HideSurvey(int surveyId)
+    {
+        try
+        {
+            var result = await SurveyService.UnpublishSurveyAsync(surveyId);
+
+            if (!result)
+            {
+                errorMessage = "Не удалось скрыть опрос.";
+                return;
+            }
+
+            successMessage = "Опрос скрыт.";
+            await LoadSurveys();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при скрытии: {ex.Message}";
+        }
+    }
+
+    private void EditSurvey(int surveyId)
+    {
+        NavigationManager.NavigateTo($"/admin/edit-survey/{surveyId}");
+    }
+
+    private async Task DeleteSurvey(int surveyId)
+    {
+        try
+        {
+            var confirmed = await JS.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить этот опрос?");
+            if (!confirmed)
+                return;
+
+            var result = await SurveyService.DeleteSurveyAsync(surveyId);
+
+            if (!result)
+            {
+                errorMessage = "Не удалось удалить опрос.";
+                return;
+            }
+
+            successMessage = "Опрос удалён.";
+            await LoadSurveys();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при удалении: {ex.Message}";
+        }
+    }
+
+    private void OpenResults(int surveyId)
+    {
+        NavigationManager.NavigateTo($"/admin/results/{surveyId}?from=admin");
+    }
+
+}

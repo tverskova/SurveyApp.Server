@@ -1,0 +1,555 @@
+﻿@page "/survey/{Id:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using SurveyApp.Server.DTOs.Responses
+@using SurveyApp.Server.DTOs.Surveys
+@using SurveyApp.Server.Services.Interfaces
+@inject ISurveyService SurveyService
+@inject IResponseService ResponseService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "User,Admin")]
+
+<PageTitle>Прохождение опроса</PageTitle>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+
+    <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+        Назад
+    </button>
+}
+else if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+else if (survey is null)
+{
+    <div class="alert alert-warning">Опрос не найден.</div>
+
+    <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+        Назад
+    </button>
+}
+else
+{
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-2">@survey.Title</h3>
+
+                    @if (!string.IsNullOrWhiteSpace(survey.Description))
+                    {
+                        <p class="text-muted mb-3">@survey.Description</p>
+                    }
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-secondary">
+                            Вопросов: @orderedQuestions.Count
+                        </span>
+
+                        <span class="badge @(survey.IsAnonymous ? "bg-dark" : "bg-info text-dark")">
+                            @(survey.IsAnonymous ? "Анонимный опрос" : "Неанонимный опрос")
+                        </span>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+                        Назад
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">
+                    Заполнено: @AnsweredCount() из @orderedQuestions.Count
+                </small>
+                <small class="text-muted">
+                    @GetProgressPercent()%
+                </small>
+            </div>
+
+            <div class="progress mt-2" style="height:8px;">
+                <div class="progress-bar bg-success"
+                     role="progressbar"
+                     style="width:@($"{GetProgressPercent()}%")">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-light border">
+        Поля, отмеченные <span class="text-danger">*</span>, обязательны для заполнения.
+    </div>
+
+    @for (int i = 0; i < orderedQuestions.Count; i++)
+    {
+        var questionIndex = i;
+        var question = orderedQuestions[questionIndex];
+
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                    <div>
+                        <h5 class="mb-1">
+                            @question.Text
+                            @if (question.IsRequired)
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </h5>
+                        
+                        @if (question.Image is not null)
+                        {
+                            <div class="my-3">
+                                <img src="data:image/jpeg;base64,@Convert.ToBase64String(question.Image)"
+                                     alt="Изображение вопроса"
+                                     class="img-fluid rounded border"
+                                     style="max-width: 400px; max-height: 400px;" />
+                            </div>
+                        }
+
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <span class="badge bg-light text-dark border">
+                                @GetQuestionTypeLabel(question.QuestionType)
+                            </span>
+
+                            @if (question.IsRequired)
+                            {
+                                <span class="badge bg-danger">Обязательный</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @if (question.QuestionType == "SingleChoice")
+                {
+                    @foreach (var option in question.Options.OrderBy(o => o.Order))
+                    {
+                        <div class="form-check mb-2">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="@($"single_{question.Id}")"
+                                   checked="@(GetSingleChoiceValue(question.Id) == option.Id)"
+                                   @onchange="() => SetSingleChoice(question.Id, option.Id)" />
+                            <label class="form-check-label">@option.Text</label>
+                        </div>
+                    }
+                }
+                else if (question.QuestionType == "MultipleChoice")
+                {
+                    @foreach (var option in question.Options.OrderBy(o => o.Order))
+                    {
+                        <div class="form-check mb-2">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   checked="@IsMultipleChoiceSelected(question.Id, option.Id)"
+                                   @onchange="e => SetMultipleChoice(question.Id, option.Id, e.Value as bool? == true)" />
+                            <label class="form-check-label">@option.Text</label>
+                        </div>
+                    }
+                }
+                else if (question.QuestionType == "Text")
+                {
+                    <textarea class="form-control"
+                              rows="4"
+                              placeholder="Введите ваш ответ"
+                              @bind="textAnswers[question.Id]"></textarea>
+                }
+                else if (question.QuestionType == "Number")
+                {
+                    <input class="form-control"
+                           type="number"
+                           placeholder="Введите число"
+                           @bind="numberAnswers[question.Id]" />
+                }
+                else if (question.QuestionType == "Rating")
+                {
+                    var min = question.RatingMin ?? 1;
+                    var max = question.RatingMax ?? 5;
+
+                    <div class="mt-4">
+
+                        <!-- Число по центру сверху -->
+                        <div class="text-center mb-2">
+                            <small class="text-secondary fs-6">
+                                @tempRatingAnswers[question.Id]
+                            </small>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-muted fw-semibold">@min</span>
+
+                            <input type="range"
+                                   class="form-range flex-grow-1"
+                                   min="@min"
+                                   max="@max"
+                                   value="@tempRatingAnswers[question.Id]"
+                                   @oninput="e => OnRatingChanging(question.Id, e.Value?.ToString())"
+                                   @onchange="() => ratingAnswers[question.Id] = tempRatingAnswers[question.Id]" />
+
+                            <span class="text-muted fw-semibold">@max</span>
+                        </div>
+
+                        <div class="text-center mt-2">
+                            <small class="text-secondary">
+                                Выбрано: <strong>@ratingAnswers[question.Id]</strong>
+                            </small>
+                        </div>
+
+                    </div>
+                }
+                else if (question.QuestionType == "YesNo")
+                {
+                    <div class="d-flex flex-column gap-2">
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="@($"yesno_{question.Id}")"
+                                   checked="@(yesNoAnswers[question.Id] == true)"
+                                   @onchange="() => yesNoAnswers[question.Id] = true" />
+                            <label class="form-check-label">Да</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="@($"yesno_{question.Id}")"
+                                   checked="@(yesNoAnswers[question.Id] == false)"
+                                   @onchange="() => yesNoAnswers[question.Id] = false" />
+                            <label class="form-check-label">Нет</label>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0 mt-4">
+        <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <div class="text-muted">
+                Проверьте ответы перед отправкой.
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="GoBack" disabled="@isSubmitting">
+                    Назад
+                </button>
+
+                <button type="button" class="btn btn-success" @onclick="SubmitSurvey" disabled="@isSubmitting">
+                    @(isSubmitting ? "Отправка..." : "Отправить ответы")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private SurveyDetailsDto? survey;
+    private List<QuestionDto> orderedQuestions = new();
+
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private Dictionary<int, int?> singleChoiceAnswers = new();
+    private Dictionary<int, HashSet<int>> multipleChoiceAnswers = new();
+    private Dictionary<int, string?> textAnswers = new();
+    private Dictionary<int, double?> numberAnswers = new();
+    private Dictionary<int, int> ratingAnswers = new();
+    private Dictionary<int, int> tempRatingAnswers = new();
+    private Dictionary<int, bool?> yesNoAnswers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSurvey();
+    }
+
+    private async Task LoadSurvey()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            successMessage = null;
+
+            survey = await SurveyService.GetSurveyDetailsAsync(Id);
+
+            if (survey != null)
+            {
+                orderedQuestions = survey.Questions
+                    .OrderBy(q => q.Order)
+                    .ToList();
+
+                foreach (var question in orderedQuestions)
+                {
+                    singleChoiceAnswers[question.Id] = null;
+                    multipleChoiceAnswers[question.Id] = new HashSet<int>();
+                    textAnswers[question.Id] = null;
+                    numberAnswers[question.Id] = null;
+
+                    var initialRating = question.RatingMin ?? 1;
+                    ratingAnswers[question.Id] = initialRating;
+                    tempRatingAnswers[question.Id] = initialRating;
+
+                    yesNoAnswers[question.Id] = null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке опроса: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private int? GetSingleChoiceValue(int questionId)
+    {
+        return singleChoiceAnswers.TryGetValue(questionId, out var value) ? value : null;
+    }
+
+    private void SetSingleChoice(int questionId, int optionId)
+    {
+        singleChoiceAnswers[questionId] = optionId;
+    }
+
+    private bool IsMultipleChoiceSelected(int questionId, int optionId)
+    {
+        return multipleChoiceAnswers.TryGetValue(questionId, out var selected) && selected.Contains(optionId);
+    }
+
+    private void SetMultipleChoice(int questionId, int optionId, bool isChecked)
+    {
+        if (!multipleChoiceAnswers.ContainsKey(questionId))
+            multipleChoiceAnswers[questionId] = new HashSet<int>();
+
+        if (isChecked)
+            multipleChoiceAnswers[questionId].Add(optionId);
+        else
+            multipleChoiceAnswers[questionId].Remove(optionId);
+    }
+
+    private void OnRatingChanging(int questionId, string? value)
+    {
+        if (int.TryParse(value, out var parsed))
+        {
+            tempRatingAnswers[questionId] = parsed;
+        }
+    }
+
+    private string GetSliderStyle(int questionId, int min, int max)
+    {
+        var value = tempRatingAnswers[questionId];
+
+        if (max <= min)
+            return "position:absolute; left:50%; transform:translateX(-50%); top:0; font-size:0.75rem; white-space:nowrap;";
+
+        var percent = (double)(value - min) / (max - min) * 100;
+
+        // Небольшая поправка, чтобы надпись визуально шла над бегунком
+        var pxOffset = 8 - (percent / 100.0 * 16);
+
+        return $"position:absolute; left:calc({percent}% + {pxOffset}px); transform:translateX(-50%); top:0; font-size:0.75rem; white-space:nowrap;";
+    }
+
+    private async Task SubmitSurvey()
+    {
+        if (survey == null)
+            return;
+
+        try
+        {
+            isSubmitting = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var dto = new SubmitSurveyResponseDto
+            {
+                SurveyId = survey.Id,
+                Answers = new List<SubmitAnswerDto>()
+            };
+
+            foreach (var question in orderedQuestions)
+            {
+                var answerDto = new SubmitAnswerDto
+                {
+                    QuestionId = question.Id
+                };
+
+                switch (question.QuestionType)
+                {
+                    case "SingleChoice":
+                        if (singleChoiceAnswers[question.Id].HasValue)
+                        {
+                            answerDto.SelectedOptionIds = new List<int>
+                            {
+                                singleChoiceAnswers[question.Id]!.Value
+                            };
+                        }
+                        break;
+
+                    case "MultipleChoice":
+                        answerDto.SelectedOptionIds = multipleChoiceAnswers[question.Id].ToList();
+                        break;
+
+                    case "Text":
+                        answerDto.TextAnswer = textAnswers[question.Id];
+                        break;
+
+                    case "Number":
+                        answerDto.NumberAnswer = numberAnswers[question.Id];
+                        break;
+
+                    case "Rating":
+                        answerDto.RatingAnswer = ratingAnswers[question.Id];
+                        break;
+
+                    case "YesNo":
+                        answerDto.YesNoAnswer = yesNoAnswers[question.Id];
+                        break;
+                }
+
+                if (question.IsRequired && IsAnswerEmpty(question, answerDto))
+                {
+                    errorMessage = $"Заполните обязательный вопрос: {question.Text}";
+                    return;
+                }
+
+                dto.Answers.Add(answerDto);
+            }
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            var result = await ResponseService.SubmitResponseAsync(dto, userId);
+
+            if (result == null)
+            {
+                errorMessage = "Не удалось сохранить ответы.";
+                return;
+            }
+
+            successMessage = "Ответы успешно отправлены.";
+            await Task.Delay(800);
+            NavigationManager.NavigateTo("/user-home");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при отправке ответов: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private bool IsAnswerEmpty(QuestionDto question, SubmitAnswerDto answer)
+    {
+        return question.QuestionType switch
+        {
+            "SingleChoice" => answer.SelectedOptionIds == null || answer.SelectedOptionIds.Count == 0,
+            "MultipleChoice" => answer.SelectedOptionIds == null || answer.SelectedOptionIds.Count == 0,
+            "Text" => string.IsNullOrWhiteSpace(answer.TextAnswer),
+            "Number" => answer.NumberAnswer == null,
+            "Rating" => answer.RatingAnswer == null,
+            "YesNo" => answer.YesNoAnswer == null,
+            _ => true
+        };
+    }
+
+    private int AnsweredCount()
+    {
+        int count = 0;
+
+        foreach (var question in orderedQuestions)
+        {
+            var dummyAnswer = new SubmitAnswerDto { QuestionId = question.Id };
+
+            switch (question.QuestionType)
+            {
+                case "SingleChoice":
+                    dummyAnswer.SelectedOptionIds = singleChoiceAnswers[question.Id] != null
+                        ? new List<int> { singleChoiceAnswers[question.Id]!.Value }
+                        : null;
+                    break;
+
+                case "MultipleChoice":
+                    dummyAnswer.SelectedOptionIds = multipleChoiceAnswers[question.Id].ToList();
+                    break;
+
+                case "Text":
+                    dummyAnswer.TextAnswer = textAnswers[question.Id];
+                    break;
+
+                case "Number":
+                    dummyAnswer.NumberAnswer = numberAnswers[question.Id];
+                    break;
+
+                case "Rating":
+                    dummyAnswer.RatingAnswer = ratingAnswers[question.Id];
+                    break;
+
+                case "YesNo":
+                    dummyAnswer.YesNoAnswer = yesNoAnswers[question.Id];
+                    break;
+            }
+
+            if (!IsAnswerEmpty(question, dummyAnswer))
+                count++;
+        }
+
+        return count;
+    }
+
+    private int GetProgressPercent()
+    {
+        if (orderedQuestions.Count == 0)
+            return 0;
+
+        return (int)((double)AnsweredCount() / orderedQuestions.Count * 100);
+    }
+
+    private string GetQuestionTypeLabel(string questionType)
+    {
+        return questionType switch
+        {
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
+            _ => questionType
+        };
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/user-home");
+    }
+}

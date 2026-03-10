@@ -1,0 +1,730 @@
+﻿@page "/admin/edit-survey/{Id:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using SurveyApp.Server.DTOs.Admin
+@using SurveyApp.Server.DTOs.QuestionBank
+@using SurveyApp.Server.Services.Interfaces
+@inject ISurveyService SurveyService
+@inject IQuestionBankService QuestionBankService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Редактирование опроса</PageTitle>
+
+<h3>Редактирование опроса</h3>
+
+@if (isLoading)
+{
+    <p>Загрузка опроса...</p>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Название опроса</label>
+        <input class="form-control" @bind="model.Title" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Описание</label>
+        <textarea class="form-control" rows="3" @bind="model.Description"></textarea>
+    </div>
+
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" @bind="model.IsAnonymous" id="isAnonymous" />
+        <label class="form-check-label" for="isAnonymous">
+            Анонимный опрос
+        </label>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Дата начала</label>
+        <InputDate @bind-Value="startDate" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Дата окончания</label>
+        <InputDate @bind-Value="endDate" class="form-control" />
+    </div>
+
+    <hr />
+
+    <h4>Вопросы</h4>
+
+    @if (model.Questions.Count == 0)
+    {
+        <p>Пока нет ни одного вопроса.</p>
+    }
+
+    @for (int i = 0; i < model.Questions.Count; i++)
+    {
+        var questionIndex = i;
+        var question = model.Questions[questionIndex];
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Вопрос @(questionIndex + 1)</h5>
+                    <button type="button"
+                            class="btn btn-danger btn-sm"
+                            @onclick="() => RemoveQuestion(questionIndex)"
+                            @onclick:preventDefault="true">
+                        Удалить вопрос
+                    </button>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Текст вопроса</label>
+                    <input class="form-control" @bind="question.Text" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Изображение</label>
+
+                    @if (question.Image is not null)
+                    {
+                        <div class="mb-2">
+                            <img src="data:image/jpeg;base64,@Convert.ToBase64String(question.Image)"
+                                 alt="Изображение вопроса"
+                                 class="img-thumbnail"
+                                 style="max-width: 300px; max-height: 300px;" />
+                        </div>
+
+                        <button type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                @onclick="() => RemoveImage(question)">
+                            Удалить изображение
+                        </button>
+                    }
+                    else
+                    {
+                        <InputFile OnChange="e => HandleSelectedImage(e, question)"
+                                   class="form-control" />
+                        <small class="text-muted">Максимальный размер файла: 2 МБ</small>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Тип вопроса</label>
+                    <select class="form-select"
+                            value="@question.QuestionType"
+                            @onchange="e => OnQuestionTypeChanged(question, e.Value?.ToString())">
+                        <option value="">-- Выберите тип вопроса --</option>
+                        <option value="SingleChoice">Один вариант ответа</option>
+                        <option value="MultipleChoice">Несколько вариантов ответа</option>
+                        <option value="Text">Текстовый ответ</option>
+                        <option value="Number">Числовой ответ</option>
+                        <option value="Rating">Рейтинг</option>
+                        <option value="YesNo">Да / Нет</option>
+                    </select>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(question.QuestionType))
+                {
+                    <div class="mb-3">
+                        <small class="text-muted">@GetQuestionTypeDescription(question.QuestionType)</small>
+                    </div>
+                }
+
+                @if (question.QuestionType == "Rating")
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Минимум шкалы</label>
+                            <input class="form-control" type="number" @bind="question.RatingMin" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Максимум шкалы</label>
+                            <input class="form-control" type="number" @bind="question.RatingMax" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Предпросмотр шкалы рейтинга</label>
+                        <div class="text-center mb-2">
+                            <small class="text-secondary fs-6">@(question.RatingMin ?? 1)</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-muted fw-semibold">@(question.RatingMin ?? 1)</span>
+                            <input type="range"
+                                   class="form-range flex-grow-1"
+                                   min="@(question.RatingMin ?? 1)"
+                                   max="@(question.RatingMax ?? 5)"
+                                   value="@(question.RatingMin ?? 1)"
+                                   disabled />
+                            <span class="text-muted fw-semibold">@(question.RatingMax ?? 5)</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" @bind="question.IsRequired" id="@($"required_{questionIndex}")" />
+                    <label class="form-check-label" for="@($"required_{questionIndex}")">
+                        Обязательный вопрос
+                    </label>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" @bind="question.HasCorrectAnswer" id="@($"correctanswer_{questionIndex}")" />
+                    <label class="form-check-label" for="@($"correctanswer_{questionIndex}")">
+                        Есть правильный ответ
+                    </label>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Порядок</label>
+                    <input class="form-control" type="number" @bind="question.Order" />
+                </div>
+
+                @if (RequiresOptions(question.QuestionType))
+                {
+                    <h6>Варианты ответа</h6>
+
+                    @if (question.Options.Count == 0)
+                    {
+                        <p>Нет вариантов ответа.</p>
+                    }
+
+                    @for (int j = 0; j < question.Options.Count; j++)
+                    {
+                        var optionIndex = j;
+                        var option = question.Options[optionIndex];
+
+                        <div class="row mb-2 align-items-center">
+                            <div class="col-md-6">
+                                <input class="form-control"
+                                       placeholder="Текст варианта"
+                                       @bind="option.Text" />
+                            </div>
+
+                            <div class="col-md-2">
+                                <input class="form-control"
+                                       type="number"
+                                       @bind="option.Order" />
+                            </div>
+
+                            <div class="col-md-2">
+                                @if (question.HasCorrectAnswer)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               @bind="option.IsCorrect"
+                                               id="@($"correct_{questionIndex}_{optionIndex}")" />
+                                        <label class="form-check-label" for="@($"correct_{questionIndex}_{optionIndex}")">
+                                            Правильный
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="col-md-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger w-100"
+                                        @onclick="() => RemoveOption(question, optionIndex)"
+                                        @onclick:preventDefault="true">
+                                    Удалить
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (question.QuestionType != "YesNo")
+                    {
+                        <button type="button"
+                                class="btn btn-outline-primary btn-sm"
+                                @onclick="() => AddOption(question)">
+                            Добавить вариант
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    @if (showQuestionBank)
+    {
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-body">
+                <h5 class="mb-3">Банк вопросов</h5>
+
+                <div class="mb-3">
+                    <input class="form-control"
+                           placeholder="Поиск по тексту вопроса..."
+                           @bind="questionBankSearch" />
+                </div>
+
+                @if (questionBankItems.Count == 0)
+                {
+                    <p class="text-muted mb-0">В банке пока нет вопросов.</p>
+                }
+                else if (FilteredQuestionBankItems.Count == 0)
+                {
+                    <p class="text-muted mb-0">По вашему запросу ничего не найдено.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Текст</th>
+                                    <th>Тип</th>
+                                    <th>Категория</th>
+                                    <th class="text-end">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in FilteredQuestionBankItems)
+                                {
+                                    <tr>
+                                        <td>@item.Text</td>
+                                        <td>@GetQuestionTypeDescription(item.QuestionType)</td>
+                                        <td>@item.Category</td>
+                                        <td class="text-end">
+                                            <button type="button"
+                                                    class="btn btn-outline-success btn-sm"
+                                                    @onclick="() => AddQuestionFromBank(item.Id)">
+                                                Добавить
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="mb-3">
+        <button type="button" class="btn btn-secondary me-2" @onclick="AddQuestion">
+            Добавить вопрос
+        </button>
+
+        <button type="button" class="btn btn-outline-primary me-2" @onclick="ToggleQuestionBank">
+            @(showQuestionBank ? "Скрыть банк вопросов" : "Добавить из банка")
+        </button>
+
+        <button type="button" class="btn btn-success me-2" @onclick="SaveSurvey" disabled="@isSaving">
+            @(isSaving ? "Сохранение..." : "Сохранить изменения")
+        </button>
+
+        <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+            Назад
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private const long MaxFileSize = 2 * 1024 * 1024;
+
+    private CreateSurveyDto model = new();
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private string? successMessage;
+    private string? errorMessage;
+    private bool isSaving;
+    private bool isLoading = true;
+
+    private bool showQuestionBank;
+    private string questionBankSearch = string.Empty;
+    private List<QuestionBankItemDto> questionBankItems = new();
+
+    private List<QuestionBankItemDto> FilteredQuestionBankItems =>
+        questionBankItems
+            .Where(q => string.IsNullOrWhiteSpace(questionBankSearch)
+                || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSurvey();
+        await LoadQuestionBank();
+    }
+
+    private async Task LoadSurvey()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var survey = await SurveyService.GetSurveyForEditAsync(Id);
+
+            if (survey == null)
+            {
+                errorMessage = "Опрос не найден.";
+                return;
+            }
+
+            model = survey;
+            startDate = model.StartDate;
+            endDate = model.EndDate;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке опроса: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadQuestionBank()
+    {
+        try
+        {
+            questionBankItems = await QuestionBankService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке банка вопросов: {ex.Message}";
+        }
+    }
+
+    private void ToggleQuestionBank()
+    {
+        showQuestionBank = !showQuestionBank;
+    }
+
+    private async Task AddQuestionFromBank(int questionBankId)
+    {
+        try
+        {
+            var question = await QuestionBankService.ConvertToSurveyQuestionAsync(questionBankId);
+
+            if (question == null)
+            {
+                errorMessage = "Не удалось загрузить вопрос из банка.";
+                return;
+            }
+
+            question.Order = model.Questions.Count + 1;
+            model.Questions.Add(question);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при добавлении вопроса из банка: {ex.Message}";
+        }
+    }
+
+    private void AddQuestion()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        model.Questions.Add(new CreateQuestionDto
+        {
+            Order = model.Questions.Count + 1,
+            QuestionType = string.Empty,
+            IsRequired = false,
+            HasCorrectAnswer = false,
+            RatingMin = 1,
+            RatingMax = 5
+        });
+    }
+
+    private void RemoveQuestion(int index)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (index >= 0 && index < model.Questions.Count)
+        {
+            model.Questions.RemoveAt(index);
+
+            for (int i = 0; i < model.Questions.Count; i++)
+            {
+                model.Questions[i].Order = i + 1;
+            }
+        }
+    }
+
+    private void AddOption(CreateQuestionDto question)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (question.QuestionType == "YesNo")
+            return;
+
+        question.Options.Add(new CreateQuestionOptionDto
+        {
+            Order = question.Options.Count + 1
+        });
+    }
+
+    private void RemoveOption(CreateQuestionDto question, int index)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (index >= 0 && index < question.Options.Count)
+        {
+            question.Options.RemoveAt(index);
+
+            for (int i = 0; i < question.Options.Count; i++)
+            {
+                question.Options[i].Order = i + 1;
+            }
+        }
+    }
+
+    private async Task HandleSelectedImage(InputFileChangeEventArgs e, CreateQuestionDto question)
+    {
+        try
+        {
+            errorMessage = null;
+            var file = e.File;
+
+            if (file == null)
+                return;
+
+            if (file.Size > MaxFileSize)
+            {
+                errorMessage = "Размер изображения не должен превышать 2 МБ.";
+                return;
+            }
+
+            using var stream = file.OpenReadStream(MaxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            question.Image = memoryStream.ToArray();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке изображения: {ex.Message}";
+        }
+    }
+
+    private void RemoveImage(CreateQuestionDto question)
+    {
+        question.Image = null;
+    }
+
+    private void OnQuestionTypeChanged(CreateQuestionDto question, string? newValue)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        question.QuestionType = newValue ?? string.Empty;
+
+        if (question.QuestionType == "YesNo")
+        {
+            question.Options.Clear();
+            question.Options.Add(new CreateQuestionOptionDto { Text = "Да", Order = 1, IsCorrect = false });
+            question.Options.Add(new CreateQuestionOptionDto { Text = "Нет", Order = 2, IsCorrect = false });
+            question.RatingMin = null;
+            question.RatingMax = null;
+            return;
+        }
+
+        if (question.QuestionType == "SingleChoice" || question.QuestionType == "MultipleChoice")
+        {
+            question.Options.Clear();
+            question.Options.Add(new CreateQuestionOptionDto { Order = 1 });
+            question.Options.Add(new CreateQuestionOptionDto { Order = 2 });
+            question.RatingMin = null;
+            question.RatingMax = null;
+            return;
+        }
+
+        if (question.QuestionType == "Rating")
+        {
+            question.Options.Clear();
+            question.RatingMin = 1;
+            question.RatingMax = 5;
+            return;
+        }
+
+        question.Options.Clear();
+        question.RatingMin = null;
+        question.RatingMax = null;
+    }
+
+    private bool RequiresOptions(string questionType)
+    {
+        return questionType == "SingleChoice"
+            || questionType == "MultipleChoice"
+            || questionType == "YesNo";
+    }
+
+    private string GetQuestionTypeDescription(string questionType)
+    {
+        return questionType switch
+        {
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
+            _ => string.Empty
+        };
+    }
+
+    private async Task SaveSurvey()
+    {
+        try
+        {
+            isSaving = true;
+            successMessage = null;
+            errorMessage = null;
+
+            if (string.IsNullOrWhiteSpace(model.Title))
+            {
+                errorMessage = "Введите название опроса.";
+                return;
+            }
+
+            if (model.Questions.Count == 0)
+            {
+                errorMessage = "Добавьте хотя бы один вопрос.";
+                return;
+            }
+
+            foreach (var question in model.Questions)
+            {
+                if (string.IsNullOrWhiteSpace(question.Text))
+                {
+                    errorMessage = "У каждого вопроса должен быть текст.";
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(question.QuestionType))
+                {
+                    errorMessage = "У каждого вопроса должен быть выбран тип.";
+                    return;
+                }
+
+                if (question.QuestionType == "Rating")
+                {
+                    if (!question.RatingMin.HasValue || !question.RatingMax.HasValue)
+                    {
+                        errorMessage = "Для вопроса с рейтингом нужно указать минимум и максимум.";
+                        return;
+                    }
+
+                    if (question.RatingMin >= question.RatingMax)
+                    {
+                        errorMessage = "Минимум рейтинга должен быть меньше максимума.";
+                        return;
+                    }
+                }
+
+                if (RequiresOptions(question.QuestionType))
+                {
+                    if (question.QuestionType == "YesNo")
+                    {
+                        if (question.Options.Count == 0)
+                        {
+                            question.Options.Add(new CreateQuestionOptionDto { Text = "Да", Order = 1, IsCorrect = false });
+                            question.Options.Add(new CreateQuestionOptionDto { Text = "Нет", Order = 2, IsCorrect = false });
+                        }
+                        else if (question.Options.Count == 1)
+                        {
+                            question.Options[0].Text = "Да";
+                            question.Options[0].Order = 1;
+                            question.Options.Add(new CreateQuestionOptionDto { Text = "Нет", Order = 2, IsCorrect = false });
+                        }
+                        else
+                        {
+                            question.Options[0].Text = "Да";
+                            question.Options[0].Order = 1;
+                            question.Options[1].Text = "Нет";
+                            question.Options[1].Order = 2;
+
+                            while (question.Options.Count > 2)
+                            {
+                                question.Options.RemoveAt(question.Options.Count - 1);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (question.Options.Count < 2)
+                        {
+                            errorMessage = "Для вопросов с выбором должно быть минимум 2 варианта.";
+                            return;
+                        }
+
+                        if (question.Options.Any(o => string.IsNullOrWhiteSpace(o.Text)))
+                        {
+                            errorMessage = "Все варианты ответа должны быть заполнены.";
+                            return;
+                        }
+                    }
+                }
+
+                if (question.HasCorrectAnswer)
+                {
+                    if (question.QuestionType == "SingleChoice" || question.QuestionType == "YesNo")
+                    {
+                        var correctCount = question.Options.Count(o => o.IsCorrect);
+
+                        if (correctCount != 1)
+                        {
+                            errorMessage = "Для вопроса с одним правильным ответом нужно выбрать ровно один правильный вариант.";
+                            return;
+                        }
+                    }
+                    else if (question.QuestionType == "MultipleChoice")
+                    {
+                        var correctCount = question.Options.Count(o => o.IsCorrect);
+
+                        if (correctCount < 1)
+                        {
+                            errorMessage = "Для вопроса с несколькими правильными ответами нужно выбрать хотя бы один правильный вариант.";
+                            return;
+                        }
+                    }
+                }
+            }
+
+            model.StartDate = startDate;
+            model.EndDate = endDate;
+
+            var updated = await SurveyService.UpdateSurveyAsync(Id, model);
+
+            if (!updated)
+            {
+                errorMessage = "Не удалось обновить опрос.";
+                return;
+            }
+
+            NavigationManager.NavigateTo("/admin?message=updated");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при сохранении: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+}

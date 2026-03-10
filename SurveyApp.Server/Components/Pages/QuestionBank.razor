@@ -1,0 +1,133 @@
+﻿@page "/admin/question-bank"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.QuestionBank
+@using SurveyApp.Server.Services.Interfaces
+@inject IQuestionBankService QuestionBankService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Банк вопросов</PageTitle>
+
+<h3 class="mb-4">Банк вопросов</h3>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <input class="form-control"
+           style="max-width: 350px;"
+           placeholder="Поиск по тексту..."
+           @bind="searchText" />
+
+    <button class="btn btn-primary"
+            @onclick="GoToCreate">
+        + Добавить вопрос
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <div class="spinner-border"></div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (FilteredItems.Count == 0)
+{
+    <div class="alert alert-secondary">Вопросы не найдены.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Текст</th>
+                    <th>Тип</th>
+                    <th>Категория</th>
+                    <th>Создан</th>
+                    <th class="text-end">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in FilteredItems)
+                {
+                    <tr>
+                        <td>@item.Text</td>
+                        <td>@item.QuestionType</td>
+                        <td>@item.Category</td>
+                        <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                        <td class="text-end">
+                            <button class="btn btn-outline-primary btn-sm me-2"
+                                    @onclick="() => Edit(item.Id)">
+                                Редактировать
+                            </button>
+
+                            <button class="btn btn-outline-danger btn-sm"
+                                    @onclick="() => Delete(item.Id)">
+                                Удалить
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<QuestionBankItemDto> items = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string searchText = "";
+
+    private List<QuestionBankItemDto> FilteredItems =>
+        items.Where(i =>
+            string.IsNullOrWhiteSpace(searchText) ||
+            i.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            isLoading = true;
+            items = await QuestionBankService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToCreate()
+    {
+        NavigationManager.NavigateTo("/admin/question-bank/create");
+    }
+
+    private void Edit(int id)
+    {
+        NavigationManager.NavigateTo($"/admin/question-bank/edit/{id}");
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Удалить вопрос из банка?");
+        if (!confirmed)
+            return;
+
+        await QuestionBankService.DeleteAsync(id);
+        await Load();
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+}
