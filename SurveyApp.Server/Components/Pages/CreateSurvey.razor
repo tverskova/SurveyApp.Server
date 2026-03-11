@@ -15,333 +15,433 @@
 
 <PageTitle>Создание опроса</PageTitle>
 
-<h3>Создание опроса</h3>
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Создание опроса</h3>
+            <p class="survey-page-subtitle">Заполните основные данные и добавьте вопросы</p>
+        </div>
+    </div>    
 
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div class="alert alert-success">@successMessage</div>
-}
+    <section class="survey-section-card">
+        <div class="survey-section-header">
+            <h4 class="survey-section-title">Основная информация</h4>
+        </div>
 
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
-<div class="mb-3">
-    <label class="form-label">Название опроса</label>
-    <input class="form-control" @bind="model.Title" />
-</div>
-
-<div class="mb-3">
-    <label class="form-label">Описание</label>
-    <textarea class="form-control" rows="3" @bind="model.Description"></textarea>
-</div>
-
-<div class="form-check mb-3">
-    <input class="form-check-input" type="checkbox" @bind="model.IsAnonymous" id="isAnonymous" />
-    <label class="form-check-label" for="isAnonymous">
-        Анонимный опрос
-    </label>
-</div>
-
-<div class="mb-3">
-    <label class="form-label">Дата начала</label>
-    <InputDate @bind-Value="startDate" class="form-control" />
-</div>
-
-<div class="mb-3">
-    <label class="form-label">Дата окончания</label>
-    <InputDate @bind-Value="endDate" class="form-control" />
-</div>
-
-<hr />
-
-<h4>Вопросы</h4>
-
-@if (model.Questions.Count == 0)
-{
-    <p>Пока нет ни одного вопроса.</p>
-}
-
-@for (int i = 0; i < model.Questions.Count; i++)
-{
-    var questionIndex = i;
-    var question = model.Questions[questionIndex];
-
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Вопрос @(questionIndex + 1)</h5>
-                <button type="button"
-                        class="btn btn-danger btn-sm"
-                        @onclick="() => RemoveQuestion(questionIndex)"
-                        @onclick:preventDefault="true">
-                    Удалить вопрос
-                </button>
+        <div class="survey-meta-grid">
+            <div class="survey-field survey-field-full">
+                <label class="form-label">Название опроса</label>
+                <input class="form-control" @bind="model.Title" placeholder="Введите название опроса" />
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Текст вопроса</label>
-                <input class="form-control" @bind="question.Text" />
+            <div class="survey-field survey-field-full">
+                <label class="form-label">Описание</label>
+                <textarea class="form-control" rows="4" @bind="model.Description" placeholder="Кратко опишите цель опроса"></textarea>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Изображение</label>
-
-                @if (question.Image is not null)
-                {
-                    <div class="mb-2">
-                        <img src="data:image/jpeg;base64,@Convert.ToBase64String(question.Image)"
-                             alt="Изображение вопроса"
-                             class="img-thumbnail"
-                             style="max-width: 300px; max-height: 300px;" />
-                    </div>
-
-                    <button type="button"
-                            class="btn btn-outline-danger btn-sm"
-                            @onclick="() => RemoveImage(question)">
-                        Удалить изображение
-                    </button>
-                }
-                else
-                {
-                    <InputFile OnChange="e => HandleSelectedImage(e, question)"
-                               class="form-control" />
-                    <small class="text-muted">Максимальный размер файла: 2 МБ</small>
-                }
+            <div class="survey-field">
+                <label class="form-label">Дата начала</label>
+                <InputDate @bind-Value="startDate" class="form-control" />
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Тип вопроса</label>
-                <select class="form-select"
-                        value="@question.QuestionType"
-                        @onchange="e => OnQuestionTypeChanged(question, e.Value?.ToString())">
-                    <option value="">-- Выберите тип вопроса --</option>
-                    <option value="SingleChoice">Один вариант ответа</option>
-                    <option value="MultipleChoice">Несколько вариантов ответа</option>
-                    <option value="Text">Текстовый ответ</option>
-                    <option value="Number">Числовой ответ</option>
-                    <option value="Rating">Рейтинг</option>
-                    <option value="YesNo">Да / Нет</option>
-                </select>
+            <div class="survey-field">
+                <label class="form-label">Дата окончания</label>
+                <InputDate @bind-Value="endDate" class="form-control" />
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(question.QuestionType))
-            {
-                <div class="mb-3">
-                    <small class="text-muted">@GetQuestionTypeDescription(question.QuestionType)</small>
+            <div class="survey-options-row survey-field-full">
+                <div class="form-check survey-check">
+                    <input class="form-check-input" type="checkbox" @bind="model.IsAnonymous" id="isAnonymous" />
+                    <label class="form-check-label" for="isAnonymous">
+                        Анонимный опрос
+                    </label>
                 </div>
-            }
-
-            @if (question.QuestionType == "Rating")
-            {
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Минимум шкалы</label>
-                        <input class="form-control" type="number" @bind="question.RatingMin" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Максимум шкалы</label>
-                        <input class="form-control" type="number" @bind="question.RatingMax" />
-                    </div>
-                </div>
-            }
-
-            <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" @bind="question.IsRequired" id="@($"required_{questionIndex}")" />
-                <label class="form-check-label" for="@($"required_{questionIndex}")">
-                    Обязательный вопрос
-                </label>
             </div>
+        </div>
+    </section>
 
-            <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" @bind="question.HasCorrectAnswer" id="@($"correctanswer_{questionIndex}")" />
-                <label class="form-check-label" for="@($"correctanswer_{questionIndex}")">
-                    Есть правильный ответ
-                </label>
+    <section class="survey-section-card">
+        <div class="survey-section-header">
+            <div>
+                <h4 class="survey-section-title">Вопросы</h4>
+                <p class="survey-section-subtitle">
+                    @(model.Questions.Count == 0 ? "Пока нет ни одного вопроса" : $"Добавлено вопросов: {model.Questions.Count}")
+                </p>
             </div>
+        </div>
 
-            <div class="mb-3">
-                <label class="form-label">Порядок</label>
-                <input class="form-control" type="number" @bind="question.Order" />
+        @if (model.Questions.Count == 0)
+        {
+            <div class="survey-empty-state">
+                <div class="survey-empty-title">Пока нет ни одного вопроса</div>
+                <div class="survey-empty-text">Добавьте вопрос вручную или выберите готовые вопросы из банка внизу страницы.</div>
             </div>
+        }
 
-            @if (RequiresOptions(question.QuestionType))
-            {
-                <h6>Варианты ответа</h6>
+        @for (int i = 0; i < model.Questions.Count; i++)
+        {
+            var questionIndex = i;
+            var question = model.Questions[questionIndex];
 
-                @if (question.Options.Count == 0)
-                {
-                    <p>Нет вариантов ответа.</p>
-                }
-
-                @for (int j = 0; j < question.Options.Count; j++)
-                {
-                    var optionIndex = j;
-                    var option = question.Options[optionIndex];
-
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <input class="form-control"
-                                   placeholder="Текст варианта"
-                                   @bind="option.Text" />
-                        </div>
-
-                        <div class="col-md-2">
-                            <input class="form-control"
-                                   type="number"
-                                   @bind="option.Order" />
-                        </div>
-
-                        <div class="col-md-2">
-                            @if (question.HasCorrectAnswer)
+            <div class="survey-question-card">
+                <div class="survey-question-header">
+                    <div class="survey-question-title-wrap">
+                        <div class="survey-order-controls">
+                            @if (questionIndex > 0)
                             {
-                                <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           @bind="option.IsCorrect"
-                                           id="@($"correct_{questionIndex}_{optionIndex}")" />
-                                    <label class="form-check-label" for="@($"correct_{questionIndex}_{optionIndex}")">
-                                        Правильный
-                                    </label>
-                                </div>
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                        title="Поднять вопрос"
+                                        @onclick="() => MoveQuestionUp(questionIndex)">
+                                    ↑
+                                </button>
+                            }
+
+                            @if (questionIndex < model.Questions.Count - 1)
+                            {
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                        title="Опустить вопрос"
+                                        @onclick="() => MoveQuestionDown(questionIndex)">
+                                    ↓
+                                </button>
                             }
                         </div>
 
-                        <div class="col-md-2">
-                            <button type="button"
-                                    class="btn btn-outline-danger w-100"
-                                    @onclick="() => RemoveOption(question, optionIndex)"
-                                    @onclick:preventDefault="true">
-                                Удалить
-                            </button>
+                        <div>
+                            <div class="survey-question-index">Вопрос @(questionIndex + 1)</div>
+                            <div class="survey-question-caption">Настройка текста, типа и параметров вопроса</div>
+
+                            <div class="survey-checks-under-title">
+                                <div class="form-check survey-check survey-check-compact">
+                                    <input class="form-check-input" type="checkbox" @bind="question.IsRequired" id="@($"required_{questionIndex}")" />
+                                    <label class="form-check-label" for="@($"required_{questionIndex}")">
+                                        Обязательный вопрос
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                }
 
-                @if (question.QuestionType != "YesNo")
-                {
                     <button type="button"
-                            class="btn btn-outline-primary btn-sm"
-                            @onclick="() => AddOption(question)">
-                        Добавить вариант
+                            class="btn btn-danger btn-sm"
+                            @onclick="() => RemoveQuestion(questionIndex)"
+                            @onclick:preventDefault="true">
+                        Удалить вопрос
                     </button>
+                </div>
+
+                <div class="survey-question-grid">
+                    <div class="survey-field survey-field-full">
+                        <label class="form-label">Текст вопроса</label>
+                        <input class="form-control" @bind="question.Text" placeholder="Введите текст вопроса" />
+                    </div>
+
+                    <div class="survey-field survey-field-full">
+                        <label class="form-label">Изображение</label>
+
+                        @if (question.Image is not null)
+                        {
+                            <div class="question-image-block">
+                                <div class="question-image-preview-wrap">
+                                    <img src="data:image/jpeg;base64,@Convert.ToBase64String(question.Image)"
+                                         alt="Изображение вопроса"
+                                         class="question-image-preview" />
+                                </div>
+
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => OpenRemoveImageConfirm(question)">
+                                    Удалить изображение
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="question-image-upload">
+                                <InputFile OnChange="e => HandleSelectedImage(e, question)"
+                                           class="form-control" />
+                                <small class="text-muted">Максимальный размер файла: 2 МБ</small>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="survey-field-full">
+                        <div class="question-settings-row @(question.QuestionType == "Rating" ? "question-settings-row-rating" : "")">
+                            <div class="survey-field">
+                                <label class="form-label">Тип вопроса</label>
+                                <select class="form-select"
+                                        value="@question.QuestionType"
+                                        @onchange="e => OnQuestionTypeChanged(question, e.Value?.ToString())">
+                                    <option value="">-- Выберите тип вопроса --</option>
+                                    <option value="SingleChoice">Один вариант ответа</option>
+                                    <option value="MultipleChoice">Несколько вариантов ответа</option>
+                                    <option value="Text">Текстовый ответ</option>
+                                    <option value="Number">Числовой ответ</option>
+                                    <option value="Rating">Рейтинг</option>
+                                    <option value="YesNo">Да / Нет</option>
+                                </select>
+
+                                @if (!string.IsNullOrWhiteSpace(question.QuestionType))
+                                {
+                                    <div class="question-type-hint">
+                                        @GetQuestionTypeDescription(question.QuestionType)
+                                    </div>
+                                }
+                            </div>
+
+                            @if (SupportsCorrectAnswer(question.QuestionType))
+                            {
+                                <div class="survey-field survey-field-correct-answer">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="form-check survey-check survey-check-inline">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               @bind="question.HasCorrectAnswer"
+                                               id="@($"correctanswer_{questionIndex}")" />
+                                        <label class="form-check-label" for="@($"correctanswer_{questionIndex}")">
+                                            Есть правильный ответ
+                                        </label>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (question.QuestionType == "Rating")
+                            {
+                                <div class="survey-field survey-field-rating">
+                                    <label class="form-label">Минимум</label>
+                                    <input class="form-control rating-number-input" type="number" @bind="question.RatingMin" />
+                                </div>
+
+                                <div class="survey-field survey-field-rating">
+                                    <label class="form-label">Максимум</label>
+                                    <input class="form-control rating-number-input" type="number" @bind="question.RatingMax" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    
+                    
+                </div>
+
+                @if (RequiresOptions(question.QuestionType))
+                {
+                    <div class="question-options-block">
+                        <div class="question-options-header">
+                            <h6 class="question-options-title">Варианты ответа</h6>
+
+                            @if (question.QuestionType != "YesNo")
+                            {
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => AddOption(question)">
+                                    Добавить вариант
+                                </button>
+                            }
+                        </div>
+
+                        @if (question.Options.Count == 0)
+                        {
+                            <div class="question-options-empty">Нет вариантов ответа.</div>
+                        }
+
+                        @for (int j = 0; j < question.Options.Count; j++)
+                        {
+                            var optionIndex = j;
+                            var option = question.Options[optionIndex];
+
+                            <div class="question-option-row @(question.HasCorrectAnswer ? "question-option-row-with-correct" : "question-option-row-no-correct")">
+                                <div class="question-option-sort">
+                                    <div class="survey-order-controls option-order-controls-vertical">
+                                        @if (optionIndex > 0)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                                    title="Поднять вариант"
+                                                    @onclick="() => MoveOptionUp(question, optionIndex)">
+                                                ↑
+                                            </button>
+                                        }
+
+                                        @if (optionIndex < question.Options.Count - 1)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                                    title="Опустить вариант"
+                                                    @onclick="() => MoveOptionDown(question, optionIndex)">
+                                                ↓
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="question-option-main">
+                                    <label class="form-label small-label">Текст варианта №@(optionIndex + 1)</label>
+                                    <input class="form-control"
+                                           placeholder="Текст варианта"
+                                           @bind="option.Text" />
+                                </div>
+
+                                @if (question.HasCorrectAnswer)
+                                {
+                                    <div class="question-option-correct">
+                                        <label class="form-label small-label d-block">Правильный ответ</label>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   @bind="option.IsCorrect"
+                                                   id="@($"correct_{questionIndex}_{optionIndex}")" />
+                                            <label class="form-check-label" for="@($"correct_{questionIndex}_{optionIndex}")">
+                                                Да
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="question-option-actions">
+                                    <label class="form-label small-label d-block">&nbsp;</label>
+                                    <button type="button"
+                                            class="btn btn-outline-danger w-100"
+                                            @onclick="() => RemoveOption(question, optionIndex)"
+                                            @onclick:preventDefault="true">
+                                        Удалить
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
-            }
+            </div>
+        }
+    </section>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    <div class="survey-bottom-actions survey-bottom-actions-inline">
+        <div class="survey-bottom-actions-left">
+            <button type="button" class="btn btn-secondary" @onclick="AddQuestion">
+                Добавить вопрос
+            </button>
+
+            <button type="button" class="btn btn-outline-primary" @onclick="OpenQuestionBankModal">
+                Добавить из банка
+            </button>
         </div>
+
+        <div class="survey-bottom-actions-center">
+            <button type="button" class="btn btn-success survey-save-btn" @onclick="SaveSurvey" disabled="@isSaving">
+                @(isSaving ? "Сохранение..." : "Сохранить опрос")
+            </button>
+        </div>
+
+        <div class="survey-bottom-actions-right"></div>
     </div>
-}
-
-<div class="mb-3">
-    <button type="button" class="btn btn-secondary me-2" @onclick="AddQuestion">
-        Добавить вопрос
-    </button>
-
-    <button type="button" class="btn btn-outline-primary me-2" @onclick="OpenQuestionBankModal">
-        Добавить из банка
-    </button>
-
-    <button type="button" class="btn btn-success me-2" @onclick="SaveSurvey" disabled="@isSaving">
-        @(isSaving ? "Сохранение..." : "Сохранить опрос")
-    </button>
-
-    <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
-        Назад
-    </button>
 </div>
 
 @if (showQuestionBankModal)
 {
-    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
-         style="z-index: 1050;">
-        <div class="bg-white rounded shadow p-4"
-             style="width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto;">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-lg">
+            <div class="survey-modal-header">
                 <h4 class="mb-0">Банк вопросов</h4>
                 <button type="button" class="btn-close" @onclick="CloseQuestionBankModal"></button>
             </div>
 
-            <div class="mb-3">
-                <input class="form-control"
-                       placeholder="Поиск по тексту вопроса..."
-                       @bind="questionBankSearch" />
-            </div>
-
-            <div class="row">
-                <div class="col-md-4">
-                    <h6>Категории</h6>
-
-                    <div class="list-group">
-                        @foreach (var category in questionBankCategories)
-                        {
-                            <button type="button"
-                                    class="list-group-item list-group-item-action @(selectedCategory == category ? "active" : "")"
-                                    @onclick="() => SelectCategory(category)">
-                                @category
-                            </button>
-                        }
-                    </div>
+            <div class="survey-modal-body">
+                <div class="search-input-wrap mb-3">
+                    <input class="form-control search-input-with-clear"
+                           placeholder="Поиск по тексту вопроса..."
+                           @bind="questionBankSearch" />
+                    @if (!string.IsNullOrWhiteSpace(questionBankSearch))
+                    {
+                        <button type="button"
+                                class="search-clear-btn"
+                                title="Очистить поиск"
+                                @onclick="ClearQuestionBankSearch">
+                            ✕
+                        </button>
+                    }
                 </div>
 
-                <div class="col-md-8">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0">Вопросы</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Категории</h6>
 
-                        @if (!string.IsNullOrWhiteSpace(selectedCategory))
-                        {
-                            <div class="d-flex gap-2">
+                        <div class="list-group survey-bank-categories">
+                            @foreach (var category in questionBankCategories)
+                            {
                                 <button type="button"
-                                        class="btn btn-outline-success btn-sm"
-                                        @onclick="() => SelectAllInCategory(selectedCategory)">
-                                    Выбрать все
+                                        class="list-group-item list-group-item-action @(selectedCategory == category ? "active" : "")"
+                                        @onclick="() => SelectCategory(category)">
+                                    @category
                                 </button>
-
-                                <button type="button"
-                                        class="btn btn-outline-secondary btn-sm"
-                                        @onclick="() => ClearCategorySelection(selectedCategory)">
-                                    Снять выбор
-                                </button>
-                            </div>
-                        }
+                            }
+                        </div>
                     </div>
 
-                    @if (FilteredQuestionBankItems.Count == 0)
-                    {
-                        <p class="text-muted">Нет вопросов для отображения.</p>
-                    }
-                    else
-                    {
-                        @foreach (var item in FilteredQuestionBankItems)
-                        {
-                            <div class="card mb-2">
-                                <div class="card-body py-2">
+                    <div class="col-md-8">
+                        <div class="mb-2">
+                            <h6 class="mb-2">Вопросы</h6>
+
+                            @if (!string.IsNullOrWhiteSpace(selectedCategory))
+                            {
+                                <div class="bank-select-all-wrap">
                                     <div class="form-check">
                                         <input class="form-check-input"
                                                type="checkbox"
-                                               checked="@selectedQuestionBankIds.Contains(item.Id)"
-                                               @onchange="e => ToggleQuestionBankSelection(item.Id, e.Value as bool? == true)"
-                                               id="@($"bank_{item.Id}")" />
-
-                                        <label class="form-check-label w-100" for="@($"bank_{item.Id}")">
-                                            <span class="fw-semibold d-block">@item.Text</span>
-                                            <span class="small text-muted">
-                                                Тип: @GetQuestionTypeDescription(item.QuestionType)
-                                                @if (!string.IsNullOrWhiteSpace(item.Category))
-                                                {
-                                                    <span> | Категория: @item.Category</span>
-                                                }
-                                            </span>
+                                               id="selectAllInCategory"
+                                               checked="@IsAllFilteredSelected"
+                                               @onchange="ToggleSelectAllFiltered" />
+                                        <label class="form-check-label" for="selectAllInCategory">
+                                            Выбрать все
                                         </label>
                                     </div>
+                                    <div class="bank-select-hint">Отметьте, чтобы выбрать или снять все отображаемые вопросы</div>
                                 </div>
-                            </div>
+                            }
+                        </div>
+
+                        @if (FilteredQuestionBankItems.Count == 0)
+                        {
+                            <p class="text-muted">Нет вопросов для отображения.</p>
                         }
-                    }
+                        else
+                        {
+                            @foreach (var item in FilteredQuestionBankItems)
+                            {
+                                <div class="card mb-2 survey-bank-item-card">
+                                    <div class="card-body py-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   checked="@selectedQuestionBankIds.Contains(item.Id)"
+                                                   @onchange="e => ToggleQuestionBankSelection(item.Id, e.Value as bool? == true)"
+                                                   id="@($"bank_{item.Id}")" />
+
+                                            <label class="form-check-label w-100" for="@($"bank_{item.Id}")">
+                                                <span class="fw-semibold d-block">@item.Text</span>
+                                                <span class="small text-muted">
+                                                    Тип: @GetQuestionTypeDescription(item.QuestionType)
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-4 d-flex justify-content-end gap-2">
+            <div class="survey-modal-footer">
                 <button type="button" class="btn btn-outline-secondary" @onclick="CloseQuestionBankModal">
                     Отмена
                 </button>
@@ -356,39 +456,64 @@
 
 @if (showQuestionBankConfirmModal)
 {
-    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
-         style="z-index: 1060;">
-        <div class="bg-white rounded shadow p-4"
-             style="width: 95%; max-width: 700px; max-height: 85vh; overflow-y: auto;">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
                 <h4 class="mb-0">Подтверждение добавления</h4>
                 <button type="button" class="btn-close" @onclick="CloseQuestionBankConfirmModal"></button>
             </div>
 
-            @if (selectedQuestionBankPreview.Count == 0)
-            {
-                <p class="text-muted">Вы не выбрали ни одного вопроса.</p>
-            }
-            else
-            {
-                <p>Будут добавлены следующие вопросы:</p>
+            <div class="survey-modal-body">
+                @if (selectedQuestionBankPreview.Count == 0)
+                {
+                    <p class="text-muted">Вы не выбрали ни одного вопроса.</p>
+                }
+                else
+                {
+                    <p>Будут добавлены следующие вопросы:</p>
 
-                <ol class="mb-3">
-                    @foreach (var item in selectedQuestionBankPreview)
-                    {
-                        <li>@item.Text</li>
-                    }
-                </ol>
-            }
+                    <ol class="mb-3">
+                        @foreach (var item in selectedQuestionBankPreview)
+                        {
+                            <li>@item.Text</li>
+                        }
+                    </ol>
+                }
+            </div>
 
-            <div class="d-flex justify-content-end gap-2">
+            <div class="survey-modal-footer">
                 <button type="button" class="btn btn-outline-secondary" @onclick="CloseQuestionBankConfirmModal">
                     Назад
                 </button>
 
                 <button type="button" class="btn btn-success" @onclick="ConfirmAddQuestionsFromBank">
                     Подтвердить
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showRemoveImageConfirmModal && imageQuestionToRemove is not null)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
+                <h4 class="mb-0">Удаление изображения</h4>
+                <button type="button" class="btn-close" @onclick="CloseRemoveImageConfirm"></button>
+            </div>
+
+            <div class="survey-modal-body">
+                <p class="mb-0">Вы действительно хотите удалить изображение вопроса?</p>
+            </div>
+
+            <div class="survey-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseRemoveImageConfirm">
+                    Отмена
+                </button>
+
+                <button type="button" class="btn btn-danger" @onclick="ConfirmRemoveImage">
+                    Удалить
                 </button>
             </div>
         </div>
@@ -413,6 +538,9 @@
     private bool showQuestionBankModal;
     private bool showQuestionBankConfirmModal;
 
+    private bool showRemoveImageConfirmModal;
+    private CreateQuestionDto? imageQuestionToRemove;
+
     private HashSet<int> selectedQuestionBankIds = new();
     private List<QuestionBankItemDto> selectedQuestionBankPreview = new();
 
@@ -423,6 +551,10 @@
                 (string.IsNullOrWhiteSpace(questionBankSearch) || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(q => q.Text)
             .ToList();
+
+    private bool IsAllFilteredSelected =>
+        FilteredQuestionBankItems.Count > 0 &&
+        FilteredQuestionBankItems.All(q => selectedQuestionBankIds.Contains(q.Id));
 
     protected override async Task OnInitializedAsync()
     {
@@ -449,6 +581,12 @@
             errorMessage = $"Ошибка при загрузке банка вопросов: {ex.Message}";
         }
     }
+    private bool SupportsCorrectAnswer(string questionType)
+    {
+        return questionType == "SingleChoice"
+            || questionType == "MultipleChoice"
+            || questionType == "YesNo";
+    }
 
     private string GetSafeCategory(string? category)
     {
@@ -468,26 +606,25 @@
             selectedQuestionBankIds.Remove(id);
     }
 
-    private void SelectAllInCategory(string category)
+    private void ToggleSelectAllFiltered(ChangeEventArgs e)
     {
-        var ids = questionBankItems
-            .Where(q => GetSafeCategory(q.Category) == category)
-            .Where(q => string.IsNullOrWhiteSpace(questionBankSearch) || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase))
-            .Select(q => q.Id);
+        var isChecked = e.Value as bool? == true;
 
-        foreach (var id in ids)
-            selectedQuestionBankIds.Add(id);
+        if (isChecked)
+        {
+            foreach (var id in FilteredQuestionBankItems.Select(q => q.Id))
+                selectedQuestionBankIds.Add(id);
+        }
+        else
+        {
+            foreach (var id in FilteredQuestionBankItems.Select(q => q.Id).ToList())
+                selectedQuestionBankIds.Remove(id);
+        }
     }
 
-    private void ClearCategorySelection(string category)
+    private void ClearQuestionBankSearch()
     {
-        var ids = questionBankItems
-            .Where(q => GetSafeCategory(q.Category) == category)
-            .Select(q => q.Id)
-            .ToList();
-
-        foreach (var id in ids)
-            selectedQuestionBankIds.Remove(id);
+        questionBankSearch = string.Empty;
     }
 
     private void OpenQuestionBankModal()
@@ -531,6 +668,8 @@
                 }
             }
 
+            RecalculateQuestionOrders();
+
             selectedQuestionBankIds.Clear();
             selectedQuestionBankPreview.Clear();
             showQuestionBankConfirmModal = false;
@@ -566,11 +705,37 @@
         if (index >= 0 && index < model.Questions.Count)
         {
             model.Questions.RemoveAt(index);
+            RecalculateQuestionOrders();
+        }
+    }
 
-            for (int i = 0; i < model.Questions.Count; i++)
-            {
-                model.Questions[i].Order = i + 1;
-            }
+    private void MoveQuestionUp(int index)
+    {
+        if (index <= 0 || index >= model.Questions.Count)
+            return;
+
+        var item = model.Questions[index];
+        model.Questions.RemoveAt(index);
+        model.Questions.Insert(index - 1, item);
+        RecalculateQuestionOrders();
+    }
+
+    private void MoveQuestionDown(int index)
+    {
+        if (index < 0 || index >= model.Questions.Count - 1)
+            return;
+
+        var item = model.Questions[index];
+        model.Questions.RemoveAt(index);
+        model.Questions.Insert(index + 1, item);
+        RecalculateQuestionOrders();
+    }
+
+    private void RecalculateQuestionOrders()
+    {
+        for (int i = 0; i < model.Questions.Count; i++)
+        {
+            model.Questions[i].Order = i + 1;
         }
     }
 
@@ -590,11 +755,37 @@
         if (index >= 0 && index < question.Options.Count)
         {
             question.Options.RemoveAt(index);
+            RecalculateOptionOrders(question);
+        }
+    }
 
-            for (int i = 0; i < question.Options.Count; i++)
-            {
-                question.Options[i].Order = i + 1;
-            }
+    private void MoveOptionUp(CreateQuestionDto question, int index)
+    {
+        if (index <= 0 || index >= question.Options.Count)
+            return;
+
+        var item = question.Options[index];
+        question.Options.RemoveAt(index);
+        question.Options.Insert(index - 1, item);
+        RecalculateOptionOrders(question);
+    }
+
+    private void MoveOptionDown(CreateQuestionDto question, int index)
+    {
+        if (index < 0 || index >= question.Options.Count - 1)
+            return;
+
+        var item = question.Options[index];
+        question.Options.RemoveAt(index);
+        question.Options.Insert(index + 1, item);
+        RecalculateOptionOrders(question);
+    }
+
+    private void RecalculateOptionOrders(CreateQuestionDto question)
+    {
+        for (int i = 0; i < question.Options.Count; i++)
+        {
+            question.Options[i].Order = i + 1;
         }
     }
 
@@ -625,9 +816,27 @@
         }
     }
 
-    private void RemoveImage(CreateQuestionDto question)
+    private void OpenRemoveImageConfirm(CreateQuestionDto question)
     {
-        question.Image = null;
+        imageQuestionToRemove = question;
+        showRemoveImageConfirmModal = true;
+    }
+
+    private void CloseRemoveImageConfirm()
+    {
+        showRemoveImageConfirmModal = false;
+        imageQuestionToRemove = null;
+    }
+
+    private void ConfirmRemoveImage()
+    {
+        if (imageQuestionToRemove is not null)
+        {
+            imageQuestionToRemove.Image = null;
+        }
+
+        showRemoveImageConfirmModal = false;
+        imageQuestionToRemove = null;
     }
 
     private void OnQuestionTypeChanged(CreateQuestionDto question, string? newValue)
@@ -659,12 +868,14 @@
             question.Options.Clear();
             question.RatingMin = 1;
             question.RatingMax = 5;
+            question.HasCorrectAnswer = false;
             return;
         }
 
         question.Options.Clear();
         question.RatingMin = null;
         question.RatingMax = null;
+        question.HasCorrectAnswer = false;
     }
 
     private bool RequiresOptions(string questionType)
@@ -823,10 +1034,5 @@
         {
             isSaving = false;
         }
-    }
-
-    private void GoBack()
-    {
-        NavigationManager.NavigateTo("/admin");
     }
 }

@@ -1,128 +1,205 @@
 ﻿@page "/admin/question-bank"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.JSInterop
 @using SurveyApp.Server.DTOs.QuestionBank
 @using SurveyApp.Server.Services.Interfaces
 @inject IQuestionBankService QuestionBankService
 @inject NavigationManager NavigationManager
-@inject IJSRuntime JS
 
 @attribute [Authorize(Roles = "Admin")]
 
 <PageTitle>Банк вопросов</PageTitle>
 
-<h3 class="mb-4">Банк вопросов</h3>
-
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <input class="form-control"
-           style="max-width: 350px;"
-           placeholder="Поиск по тексту..."
-           @bind="searchText" />
-
-    <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary"
-                @onclick="GoToImport">
-            Импорт
-        </button>
-        
-        <a class="btn btn-outline-success"
-           href="/api/export/question-bank/excel"
-           target="_blank">
-            Экспорт Excel
-        </a>
-
-        <a class="btn btn-outline-secondary"
-           href="/api/export/question-bank/xml"
-           target="_blank">
-            Экспорт XML
-        </a>
-        <button class="btn btn-primary"
-                @onclick="GoToCreate">
-            + Добавить вопрос
-        </button>
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Банк вопросов</h3>
+            <p class="survey-page-subtitle">Управление готовыми вопросами для повторного использования</p>
+        </div>
     </div>
-</div>
 
-@if (isLoading)
-{
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Загрузка...</span>
-    </div>
-}
-else if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-else if (GroupedItems.Count == 0)
-{
-    <div class="alert alert-secondary">Вопросы не найдены.</div>
-}
-else
-{
-    @foreach (var group in GroupedItems)
-    {
-        var category = group.Key;
-        var isExpanded = expandedCategories.Contains(category);
+    <section class="survey-section-card">
+        <div class="survey-section-header survey-section-header-between question-bank-header-row">
+            <div>
+                <h4 class="survey-section-title">Список вопросов</h4>
+            </div>
 
-        <div class="card mb-3 shadow-sm border-0">
-            <div class="card-body">
-                <button type="button"
-                        class="btn w-100 text-start p-0 border-0 bg-transparent"
-                        @onclick="() => ToggleCategory(category)">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold" style="width: 20px;">
-                                @(isExpanded ? "▼" : "▶")
-                            </span>
-
-                            <div>
-                                <h5 class="mb-1">@category</h5>
-                                <small class="text-muted">Вопросов: @group.Value.Count</small>
-                            </div>
-                        </div>
-                    </div>
+            <div class="question-bank-header-actions">
+                <button class="btn btn-primary" @onclick="GoToCreate">
+                    + Добавить вопрос
                 </button>
 
-                @if (isExpanded)
-                {
-                    <div class="table-responsive mt-3">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Текст</th>
-                                    <th>Тип</th>
-                                    <th>Создан</th>
-                                    <th class="text-end">Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var item in group.Value)
-                                {
-                                    <tr>
-                                        <td>@item.Text</td>
-                                        <td>@GetQuestionTypeLabel(item.QuestionType)</td>
-                                        <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
-                                        <td class="text-end">
-                                            <button class="btn btn-outline-primary btn-sm me-2"
-                                                    @onclick="() => Edit(item.Id)">
-                                                Редактировать
-                                            </button>
+                <div class="question-bank-top-actions">
+                    <button class="btn btn-outline-primary" @onclick="GoToImport">
+                        Импорт
+                    </button>
 
-                                            <button class="btn btn-outline-danger btn-sm"
-                                                    @onclick="() => Delete(item.Id)">
-                                                Удалить
-                                            </button>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
+                    <button class="btn btn-success" @onclick="OpenExportModal">
+                        Экспорт
+                    </button>
+                </div>
             </div>
         </div>
-    }
+
+        <div class="search-input-wrap question-bank-search-wrap mb-3">
+            <input class="form-control search-input-with-clear"
+                   placeholder="Поиск по тексту или категории..."
+                   @bind="searchText" />
+
+            @if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                <button type="button"
+                        class="search-clear-btn"
+                        title="Очистить поиск"
+                        @onclick="ClearSearch">
+                    ✕
+                </button>
+            }
+        </div>
+
+        @if (isLoading)
+        {
+            <p>Загрузка вопросов...</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        else if (GroupedItems.Count == 0)
+        {
+            <div class="survey-empty-state">
+                <div class="survey-empty-title">Вопросы не найдены</div>
+                <div class="survey-empty-text">Попробуйте изменить строку поиска или добавьте новый вопрос.</div>
+            </div>
+        }
+        else
+        {
+            @foreach (var group in GroupedItems)
+            {
+                var category = group.Key;
+                var isExpanded = expandedCategories.Contains(category);
+
+                <div class="card mb-3 survey-bank-item-card question-bank-category-card">
+                    <div class="card-body">
+                        <button type="button"
+                                class="btn w-100 text-start p-0 border-0 bg-transparent"
+                                @onclick="() => ToggleCategory(category)">
+                            <div class="question-bank-category-header">
+                                <div class="question-bank-category-left">
+                                    <span class="question-bank-category-icon @(isExpanded ? "expanded" : "")">
+                                        @(isExpanded ? "↑" : "↓")
+                                    </span>
+
+                                    <div>
+                                        <h5 class="mb-1">@category</h5>
+                                        <small class="text-muted">Вопросов: @group.Value.Count</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+
+                        @if (isExpanded)
+                        {
+                            <div class="table-responsive mt-3">
+                                <table class="table admin-table align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Текст</th>
+                                            <th>Тип</th>
+                                            <th>Создан</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in group.Value)
+                                        {
+                                            <tr>
+                                                <td>@item.Text</td>
+                                                <td>@GetQuestionTypeLabel(item.QuestionType)</td>
+                                                <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                                <td class="question-bank-actions-cell">
+                                                    <button class="btn btn-success btn-sm"
+                                                            @onclick="() => Edit(item.Id)">
+                                                        Редактировать
+                                                    </button>
+
+                                                    <button class="btn btn-danger btn-sm"
+                                                            @onclick="() => OpenDeleteModal(item.Id)">
+                                                        Удалить
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </section>
+</div>
+
+@if (showExportModal)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
+                <h4 class="mb-0">Экспорт банка вопросов</h4>
+                <button type="button" class="btn-close" @onclick="CloseExportModal"></button>
+            </div>
+
+            <div class="survey-modal-body">
+                <div class="survey-field">
+                    <label class="form-label">Формат файла</label>
+                    <select class="form-select" @bind="selectedExportType">
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="xml">XML (.xml)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="survey-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseExportModal">
+                    Отмена
+                </button>
+
+                <a class="btn btn-success"
+                       href="@GetExportUrl()"
+                       target="_blank"
+                       @onclick="CloseExportModal">
+                    Скачать
+                </a>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
+                <h4 class="mb-0">Удаление вопроса</h4>
+                <button type="button" class="btn-close" @onclick="CloseDeleteModal"></button>
+            </div>
+
+            <div class="survey-modal-body">
+                <p class="mb-0">Вы действительно хотите удалить вопрос из банка?</p>
+            </div>
+
+            <div class="survey-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseDeleteModal">
+                    Отмена
+                </button>
+
+                <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteAsync">
+                    Удалить
+                </button>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
@@ -132,6 +209,12 @@ else
     private string searchText = string.Empty;
 
     private HashSet<string> expandedCategories = new();
+
+    private bool showExportModal;
+    private string selectedExportType = "excel";
+
+    private bool showDeleteModal;
+    private int? deletingQuestionId;
 
     private Dictionary<string, List<QuestionBankItemDto>> GroupedItems =>
         items
@@ -158,7 +241,6 @@ else
             isLoading = true;
             errorMessage = null;
             items = await QuestionBankService.GetAllAsync();
-
             expandedCategories.Clear();
         }
         catch (Exception ex)
@@ -179,6 +261,11 @@ else
             expandedCategories.Add(category);
     }
 
+    private void ClearSearch()
+    {
+        searchText = string.Empty;
+    }
+
     private void GoToCreate()
     {
         NavigationManager.NavigateTo("/admin/question-bank/create");
@@ -194,13 +281,43 @@ else
         NavigationManager.NavigateTo($"/admin/question-bank/edit/{id}");
     }
 
-    private async Task Delete(int id)
+    private void OpenExportModal()
     {
-        var confirmed = await JS.InvokeAsync<bool>("confirm", "Удалить вопрос из банка?");
-        if (!confirmed)
+        showExportModal = true;
+    }
+
+    private void CloseExportModal()
+    {
+        showExportModal = false;
+    }
+
+    private string GetExportUrl()
+    {
+        return selectedExportType == "excel"
+            ? "/api/export/question-bank/excel"
+            : "/api/export/question-bank/xml";
+    }
+
+    private void OpenDeleteModal(int id)
+    {
+        deletingQuestionId = id;
+        showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        deletingQuestionId = null;
+        showDeleteModal = false;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (!deletingQuestionId.HasValue)
             return;
 
-        await QuestionBankService.DeleteAsync(id);
+        await QuestionBankService.DeleteAsync(deletingQuestionId.Value);
+        deletingQuestionId = null;
+        showDeleteModal = false;
         await Load();
     }
 

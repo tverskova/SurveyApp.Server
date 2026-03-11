@@ -11,181 +11,202 @@
 
 <PageTitle>Импорт в банк вопросов</PageTitle>
 
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Импорт в банк вопросов</h3>
+            <p class="survey-page-subtitle">Загрузите Excel или XML и выберите вопросы для сохранения</p>
+        </div>
+    </div>
 
-<h3 class="mb-4">Импорт в банк вопросов</h3>
-
-@if (!string.IsNullOrWhiteSpace(successMessage))
-{
-    <div class="alert alert-success">@successMessage</div>
-}
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="mb-3">
-            <label class="form-label">Тип файла</label>
-            <select class="form-select" @bind="selectedImportType">
-                <option value="excel">Excel (.xlsx)</option>
-                <option value="xml">XML (.xml)</option>
-            </select>
+    <section class="survey-section-card">
+        <div class="survey-section-header">
+            <h4 class="survey-section-title">Параметры импорта</h4>
         </div>
 
-        <div class="mb-3">
-            <label class="form-label">Подсказка по формату</label>
+        <div class="survey-meta-grid">
+            <div class="survey-field">
+                <label class="form-label">Тип файла</label>
+                <select class="form-select" @bind="selectedImportType">
+                    <option value="excel">Excel (.xlsx)</option>
+                    <option value="xml">XML (.xml)</option>
+                </select>
+            </div>
 
-            @if (selectedImportType == "excel")
-            {
-                <div class="alert alert-light border mb-0">
-                    <div class="fw-semibold mb-2">Excel должен содержать колонки:</div>
-                    <div class="small">
-                        QuestionCode, Category, Text, QuestionType, IsRequired, HasCorrectAnswer, RatingMin, RatingMax, OptionText, OptionOrder, IsCorrect
+            <div class="survey-field survey-field-full">
+                <label class="form-label">Подсказка по формату</label>
+
+                @if (selectedImportType == "excel")
+                {
+                    <div class="survey-format-hint">
+                        <div class="survey-format-hint-title">Excel должен содержать колонки:</div>
+                        <div class="survey-format-hint-text">
+                            QuestionCode, Category, Text, QuestionType, IsRequired, HasCorrectAnswer, RatingMin, RatingMax, OptionText, OptionOrder, IsCorrect
+                        </div>
                     </div>
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-light border mb-0">
-                    <div class="fw-semibold mb-2">XML должен содержать структуру:</div>
-                    <div class="small">
-                        Корневой элемент Questions, внутри элементы Question, внутри при необходимости Options → Option
+                }
+                else
+                {
+                    <div class="survey-format-hint">
+                        <div class="survey-format-hint-title">XML должен содержать структуру:</div>
+                        <div class="survey-format-hint-text">
+                            Корневой элемент Questions, внутри элементы Question, внутри при необходимости Options → Option
+                        </div>
                     </div>
+                }
+            </div>
+
+            <div class="survey-field survey-field-full">
+                <label class="form-label">Файл для импорта</label>
+                <div class="question-image-upload">
+                    <InputFile OnChange="OnFileSelected"
+                               accept="@GetAccept()"
+                               class="form-control" />
+
+                    @if (selectedFile is not null)
+                    {
+                        <small class="text-muted">Выбран файл: @selectedFile.Name</small>
+                    }
                 </div>
-            }
+            </div>
         </div>
+    </section>
 
-        <div class="mb-3">
-            <label class="form-label">Файл для импорта</label>
-            <InputFile OnChange="OnFileSelected"
-                       accept="@GetAccept()"
-                       class="form-control" />
-        </div>
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success survey-bottom-alert">@successMessage</div>
+    }
 
-        <div class="d-flex gap-2">
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger survey-bottom-alert">@errorMessage</div>
+    }
+
+    <div class="survey-bottom-actions survey-bottom-actions-inline">
+        <div class="survey-bottom-actions-left"></div>
+
+        <div class="survey-bottom-actions-center">
             <button type="button"
-                    class="btn btn-primary"
+                    class="btn btn-success survey-save-btn"
                     @onclick="ImportPreviewAsync"
                     disabled="@isImporting">
                 @(isImporting ? "Чтение..." : "Импортировать")
             </button>
-
-            <button type="button"
-                    class="btn btn-outline-secondary"
-                    @onclick="GoBack">
-                Назад
-            </button>
         </div>
+
+        <div class="survey-bottom-actions-right"></div>
     </div>
 </div>
 
 @if (showPreviewModal)
 {
-    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
-         style="z-index: 1050;">
-        <div class="bg-white rounded shadow p-4"
-             style="width:95%; max-width:1100px; max-height:90vh; overflow-y:auto;">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-lg">
+            <div class="survey-modal-header">
                 <h4 class="mb-0">Предпросмотр импортируемых вопросов</h4>
                 <button type="button" class="btn-close" @onclick="ClosePreviewModal"></button>
             </div>
 
-            @if (previewItems.Count == 0)
-            {
-                <p class="text-muted">Не удалось прочитать ни одного вопроса.</p>
-            }
-            else
-            {
-                <div class="mb-3 d-flex gap-2">
-                    <button type="button" class="btn btn-outline-success btn-sm" @onclick="SelectAllPreview">
-                        Выбрать все
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearPreviewSelection">
-                        Снять выбор
-                    </button>
-                </div>
-
-                @foreach (var group in GroupedPreviewItems)
+            <div class="survey-modal-body">
+                @if (previewItems.Count == 0)
                 {
-                    var category = group.Key;
-                    var isExpanded = expandedPreviewCategories.Contains(category);
+                    <p class="text-muted">Не удалось прочитать ни одного вопроса.</p>
+                }
+                else
+                {
+                    <div class="bank-select-all-wrap mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="selectAllPreview"
+                                   checked="@IsAllPreviewSelected"
+                                   @onchange="ToggleSelectAllPreview" />
+                            <label class="form-check-label" for="selectAllPreview">
+                                Выбрать все
+                            </label>
+                        </div>
+                        <div class="bank-select-hint">Отметьте, чтобы выбрать или снять выбор со всех импортируемых вопросов</div>
+                    </div>
 
-                    <div class="card mb-3 shadow-sm border-0">
-                        <div class="card-body">
-                            <button type="button"
-                                    class="btn w-100 text-start p-0 border-0 bg-transparent"
-                                    @onclick="() => TogglePreviewCategory(category)">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="fw-bold" style="width: 20px;">
-                                            @(isExpanded ? "▼" : "▶")
-                                        </span>
+                    @foreach (var group in GroupedPreviewItems)
+                    {
+                        var category = group.Key;
+                        var isExpanded = expandedPreviewCategories.Contains(category);
 
-                                        <div>
-                                            <h5 class="mb-1">@category</h5>
-                                            <small class="text-muted">Вопросов: @group.Value.Count</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </button>
+                        <div class="card mb-3 survey-bank-item-card">
+                            <div class="card-body">
+                                <button type="button"
+                                        class="btn w-100 text-start p-0 border-0 bg-transparent"
+                                        @onclick="() => TogglePreviewCategory(category)">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold" style="width: 20px;">
+                                                @(isExpanded ? "▼" : "▶")
+                                            </span>
 
-                            @if (isExpanded)
-                            {
-                                <div class="mt-3">
-                                    <div class="mb-2 d-flex gap-2">
-                                        <button type="button"
-                                                class="btn btn-outline-success btn-sm"
-                                                @onclick="() => SelectAllInPreviewCategory(category)">
-                                            Выбрать все в категории
-                                        </button>
-
-                                        <button type="button"
-                                                class="btn btn-outline-secondary btn-sm"
-                                                @onclick="() => ClearPreviewCategorySelection(category)">
-                                            Снять выбор в категории
-                                        </button>
-                                    </div>
-
-                                    @foreach (var item in group.Value)
-                                    {
-                                        <div class="card mb-2">
-                                            <div class="card-body py-2">
-                                                <div class="form-check">
-                                                    <input class="form-check-input"
-                                                           type="checkbox"
-                                                           checked="@selectedPreviewIds.Contains(item.TempId)"
-                                                           @onchange="e => TogglePreviewSelection(item.TempId, e.Value as bool? == true)"
-                                                           id="@($"preview_{item.TempId}")" />
-
-                                                    <label class="form-check-label w-100" for="@($"preview_{item.TempId}")">
-                                                        <span class="fw-semibold d-block">@item.Text</span>
-                                                        <span class="small text-muted d-block">
-                                                            Тип: @GetQuestionTypeLabel(item.QuestionType)
-                                                        </span>
-
-                                                        @if (item.Options.Count > 0)
-                                                        {
-                                                            <span class="small text-muted d-block">
-                                                                Варианты:
-                                                                @string.Join(", ", item.Options.OrderBy(o => o.Order).Select(o => o.Text))
-                                                            </span>
-                                                        }
-                                                    </label>
-                                                </div>
+                                            <div>
+                                                <h5 class="mb-1">@category</h5>
+                                                <small class="text-muted">Вопросов: @group.Value.Count</small>
                                             </div>
                                         </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
-            }
+                                    </div>
+                                </button>
 
-            <div class="mt-4 d-flex justify-content-end gap-2">
+                                @if (isExpanded)
+                                {
+                                    <div class="mt-3">
+                                        <div class="bank-select-all-wrap mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       id="@($"selectCategory_{category.GetHashCode()}")"
+                                                       checked="@IsAllPreviewCategorySelected(category)"
+                                                       @onchange="e => TogglePreviewCategorySelection(category, e)" />
+                                                <label class="form-check-label" for="@($"selectCategory_{category.GetHashCode()}")">
+                                                    Выбрать все в категории
+                                                </label>
+                                            </div>
+                                            <div class="bank-select-hint">Отметьте, чтобы выбрать или снять выбор со всех вопросов этой категории</div>
+                                        </div>
+
+                                        @foreach (var item in group.Value)
+                                        {
+                                            <div class="card mb-2 survey-bank-item-card">
+                                                <div class="card-body py-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input"
+                                                               type="checkbox"
+                                                               checked="@selectedPreviewIds.Contains(item.TempId)"
+                                                               @onchange="e => TogglePreviewSelection(item.TempId, e.Value as bool? == true)"
+                                                               id="@($"preview_{item.TempId}")" />
+
+                                                        <label class="form-check-label w-100" for="@($"preview_{item.TempId}")">
+                                                            <span class="fw-semibold d-block">@item.Text</span>
+                                                            <span class="small text-muted d-block">
+                                                                Тип: @GetQuestionTypeLabel(item.QuestionType)
+                                                            </span>
+
+                                                            @if (item.Options.Count > 0)
+                                                            {
+                                                                <span class="small text-muted d-block">
+                                                                    Варианты:
+                                                                    @string.Join(", ", item.Options.OrderBy(o => o.Order).Select(o => o.Text))
+                                                                </span>
+                                                            }
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="survey-modal-footer">
                 <button type="button" class="btn btn-outline-secondary" @onclick="ClosePreviewModal">
                     Отмена
                 </button>
@@ -200,33 +221,32 @@
 
 @if (showConfirmModal)
 {
-    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
-         style="z-index: 1060;">
-        <div class="bg-white rounded shadow p-4"
-             style="width:95%; max-width:700px; max-height:85vh; overflow-y:auto;">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
                 <h4 class="mb-0">Подтверждение импорта</h4>
                 <button type="button" class="btn-close" @onclick="CloseConfirmModal"></button>
             </div>
 
-            @if (selectedPreviewItems.Count == 0)
-            {
-                <p class="text-muted">Не выбрано ни одного вопроса.</p>
-            }
-            else
-            {
-                <p>Будут импортированы следующие вопросы:</p>
+            <div class="survey-modal-body">
+                @if (selectedPreviewItems.Count == 0)
+                {
+                    <p class="text-muted">Не выбрано ни одного вопроса.</p>
+                }
+                else
+                {
+                    <p>Будут импортированы следующие вопросы:</p>
 
-                <ol class="mb-3">
-                    @foreach (var item in selectedPreviewItems)
-                    {
-                        <li>@item.Text</li>
-                    }
-                </ol>
-            }
+                    <ol class="mb-3">
+                        @foreach (var item in selectedPreviewItems)
+                        {
+                            <li>@item.Text</li>
+                        }
+                    </ol>
+                }
+            </div>
 
-            <div class="d-flex justify-content-end gap-2">
+            <div class="survey-modal-footer">
                 <button type="button" class="btn btn-outline-secondary" @onclick="CloseConfirmModal">
                     Назад
                 </button>
@@ -268,6 +288,10 @@
                 g => g.Key,
                 g => g.OrderBy(x => x.Text).ToList()
             );
+
+    private bool IsAllPreviewSelected =>
+        previewItems.Count > 0 &&
+        previewItems.All(x => selectedPreviewIds.Contains(x.TempId));
 
     private void OnFileSelected(InputFileChangeEventArgs e)
     {
@@ -324,14 +348,14 @@
             selectedPreviewIds.Remove(id);
     }
 
-    private void SelectAllPreview()
+    private void ToggleSelectAllPreview(ChangeEventArgs e)
     {
-        selectedPreviewIds = previewItems.Select(x => x.TempId).ToHashSet();
-    }
+        var isChecked = e.Value as bool? == true;
 
-    private void ClearPreviewSelection()
-    {
-        selectedPreviewIds.Clear();
+        if (isChecked)
+            selectedPreviewIds = previewItems.Select(x => x.TempId).ToHashSet();
+        else
+            selectedPreviewIds.Clear();
     }
 
     private void TogglePreviewCategory(string category)
@@ -342,20 +366,27 @@
             expandedPreviewCategories.Add(category);
     }
 
-    private void SelectAllInPreviewCategory(string category)
+    private bool IsAllPreviewCategorySelected(string category)
     {
-        var ids = GroupedPreviewItems[category].Select(x => x.TempId);
-
-        foreach (var id in ids)
-            selectedPreviewIds.Add(id);
+        var items = GroupedPreviewItems[category];
+        return items.Count > 0 && items.All(x => selectedPreviewIds.Contains(x.TempId));
     }
 
-    private void ClearPreviewCategorySelection(string category)
+    private void TogglePreviewCategorySelection(string category, ChangeEventArgs e)
     {
+        var isChecked = e.Value as bool? == true;
         var ids = GroupedPreviewItems[category].Select(x => x.TempId).ToList();
 
-        foreach (var id in ids)
-            selectedPreviewIds.Remove(id);
+        if (isChecked)
+        {
+            foreach (var id in ids)
+                selectedPreviewIds.Add(id);
+        }
+        else
+        {
+            foreach (var id in ids)
+                selectedPreviewIds.Remove(id);
+        }
     }
 
     private void ClosePreviewModal()
@@ -420,10 +451,5 @@
             "YesNo" => "Да / Нет",
             _ => type
         };
-    }
-
-    private void GoBack()
-    {
-        NavigationManager.NavigateTo("/admin/question-bank");
     }
 }

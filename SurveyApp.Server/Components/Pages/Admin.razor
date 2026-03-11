@@ -3,8 +3,8 @@
 @using Microsoft.AspNetCore.Authorization
 @using SurveyApp.Server.DTOs.Surveys
 @using SurveyApp.Server.Services.Interfaces
-@inject ISurveyService SurveyService
 @using Microsoft.AspNetCore.Components
+@inject ISurveyService SurveyService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
@@ -39,7 +39,7 @@ else if (surveys.Count == 0)
 }
 else
 {
-    <table class="table table-striped">
+    <table class="table admin-table">
         <thead>
             <tr>
                 <th>Id</th>
@@ -49,13 +49,15 @@ else
                 <th>Анонимный</th>
                 <th>Дата начала</th>
                 <th>Дата окончания</th>
-                <th>Действия</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var survey in surveys)
             {
-                <tr>
+                var isExpanded = expandedSurveyId == survey.Id;
+
+                <tr class="survey-row @(isExpanded ? "survey-row-active" : "")"
+                    @onclick="() => ToggleSurveyActions(survey.Id)">
                     <td>@survey.Id</td>
                     <td>@survey.Title</td>
                     <td>@survey.Description</td>
@@ -63,38 +65,53 @@ else
                     <td>@(survey.IsAnonymous ? "Да" : "Нет")</td>
                     <td>@FormatDate(survey.StartDate)</td>
                     <td>@FormatDate(survey.EndDate)</td>
-                    <td>
-                        @if (!survey.IsPublished)
-                        {
-                            <button class="btn btn-success btn-sm me-2"
-                                    @onclick="() => PublishSurvey(survey.Id)">
-                                Опубликовать
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-warning btn-sm me-2"
-                                    @onclick="() => HideSurvey(survey.Id)">
-                                Скрыть
-                            </button>
-                        }
-
-                        <button class="btn btn-primary btn-sm me-2"
-                                @onclick="() => EditSurvey(survey.Id)">
-                            Редактировать
-                        </button>
-
-                        <button class="btn btn-danger btn-sm"
-                                @onclick="() => DeleteSurvey(survey.Id)">
-                            Удалить
-                        </button>
-
-                        <button class="btn btn-outline-primary btn-sm me-2"
-                                @onclick="() => OpenResults(survey.Id)">
-                            Результаты
-                        </button>
-                    </td>
                 </tr>
+
+                @if (isExpanded)
+                {
+                    <tr class="actions-expand-row">
+                        <td colspan="7">
+                            <div class="actions-panel">
+                                <div class="actions-column">
+                                    @if (!survey.IsPublished)
+                                    {
+                                        <button class="btn btn-info btn-sm"
+                                                @onclick:stopPropagation="true"
+                                                @onclick="() => PublishSurvey(survey.Id)">
+                                            Опубликовать
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-warning btn-sm"
+                                                @onclick:stopPropagation="true"
+                                                @onclick="() => HideSurvey(survey.Id)">
+                                            Скрыть
+                                        </button>
+                                    }
+
+                                    <button class="btn btn-primary btn-sm"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => EditSurvey(survey.Id)">
+                                        Редактировать
+                                    </button>
+
+                                    <button class="btn btn-danger btn-sm"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => DeleteSurvey(survey.Id)">
+                                        Удалить
+                                    </button>
+
+                                    <button class="btn btn-outline-primary btn-sm"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => OpenResults(survey.Id)">
+                                        Результаты
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -105,10 +122,10 @@ else
     public string? Message { get; set; }
 
     private string? successMessage;
-
     private List<SurveyListItemDto> surveys = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private int? expandedSurveyId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -132,7 +149,6 @@ else
         {
             isLoading = true;
             errorMessage = null;
-
             surveys = await SurveyService.GetAllSurveysAsync();
         }
         catch (Exception ex)
@@ -143,6 +159,11 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void ToggleSurveyActions(int surveyId)
+    {
+        expandedSurveyId = expandedSurveyId == surveyId ? null : surveyId;
     }
 
     private void GoToCreateSurvey()
@@ -231,5 +252,4 @@ else
     {
         NavigationManager.NavigateTo($"/admin/results/{surveyId}?from=admin");
     }
-
 }

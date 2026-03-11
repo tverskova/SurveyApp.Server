@@ -11,15 +11,11 @@
 
 <PageTitle>Редактирование вопроса</PageTitle>
 
-<h3 class="mb-4">Редактирование вопроса</h3>
-
 @if (isLoading)
 {
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Загрузка...</span>
-    </div>
+    <p>Загрузка вопроса...</p>
 }
-else if (!string.IsNullOrWhiteSpace(errorMessage))
+else if (!string.IsNullOrWhiteSpace(errorMessage) && model is null)
 {
     <div class="alert alert-danger">@errorMessage</div>
 }
@@ -29,120 +25,142 @@ else if (model is null)
 }
 else
 {
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <div class="survey-editor-page">
+        <div class="survey-page-header">
+            <div>
+                <h3 class="survey-page-title">Редактирование вопроса</h3>
+                <p class="survey-page-subtitle">Измените вопрос и сохраните обновлённую версию в банке</p>
+            </div>
+        </div>
 
-            <div class="mb-3">
-                <label class="form-label">Текст вопроса</label>
-                <textarea class="form-control" rows="3" @bind="model.Text"></textarea>
+        <section class="survey-section-card">
+            <div class="survey-section-header">
+                <h4 class="survey-section-title">Основная информация</h4>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Категория</label>
-                <input class="form-control"
-                       @bind="model.Category"
-                       placeholder="Например: География, История, Математика" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Изображение</label>
-
-                @if (model.Image is not null)
-                {
-                    <div class="mb-2">
-                        <img src="data:image/jpeg;base64,@Convert.ToBase64String(model.Image)"
-                             alt="Изображение вопроса"
-                             class="img-thumbnail"
-                             style="max-width:300px; max-height:300px;" />
-                    </div>
-
-                    <button type="button"
-                            class="btn btn-outline-danger btn-sm"
-                            @onclick="RemoveImage">
-                        Удалить изображение
-                    </button>
-                }
-                else
-                {
-                    <InputFile OnChange="HandleImage" class="form-control" />
-                    <small class="text-muted">Максимальный размер файла: 2 МБ</small>
-                }
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Тип вопроса</label>
-                <select class="form-select"
-                        value="@model.QuestionType"
-                        @onchange="e => OnTypeChanged(e.Value?.ToString())">
-                    <option value="">-- Выберите тип вопроса --</option>
-                    <option value="SingleChoice">Один вариант ответа</option>
-                    <option value="MultipleChoice">Несколько вариантов ответа</option>
-                    <option value="Text">Текстовый ответ</option>
-                    <option value="Number">Числовой ответ</option>
-                    <option value="Rating">Рейтинг</option>
-                    <option value="YesNo">Да / Нет</option>
-                </select>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(model.QuestionType))
-            {
-                <div class="mb-3">
-                    <small class="text-muted">@GetQuestionTypeDescription(model.QuestionType)</small>
-                </div>
-            }
-
-            @if (model.QuestionType == "Rating")
-            {
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Минимум шкалы</label>
-                        <input class="form-control" type="number" @bind="model.RatingMin" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Максимум шкалы</label>
-                        <input class="form-control" type="number" @bind="model.RatingMax" />
-                    </div>
+            <div class="survey-meta-grid">
+                <div class="survey-field survey-field-full">
+                    <label class="form-label">Текст вопроса</label>
+                    <textarea class="form-control" rows="4" @bind="model.Text" placeholder="Введите текст вопроса"></textarea>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Предпросмотр шкалы рейтинга</label>
-                    <div class="text-center mb-2">
-                        <small class="text-secondary fs-6">@(model.RatingMin ?? 1)</small>
-                    </div>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="text-muted fw-semibold">@(model.RatingMin ?? 1)</span>
-                        <input type="range"
-                               class="form-range flex-grow-1"
-                               min="@(model.RatingMin ?? 1)"
-                               max="@(model.RatingMax ?? 5)"
-                               value="@(model.RatingMin ?? 1)"
-                               disabled />
-                        <span class="text-muted fw-semibold">@(model.RatingMax ?? 5)</span>
+                <div class="survey-field survey-field-full">
+                    <label class="form-label">Категория</label>
+                    <input class="form-control"
+                           @bind="model.Category"
+                           placeholder="Например: География, История, Математика" />
+                </div>
+
+                <div class="survey-field survey-field-full">
+                    <label class="form-label">Изображение</label>
+
+                    @if (model.Image is not null)
+                    {
+                        <div class="question-image-block">
+                            <div class="question-image-preview-wrap">
+                                <img src="data:image/jpeg;base64,@Convert.ToBase64String(model.Image)"
+                                     alt="Изображение вопроса"
+                                     class="question-image-preview" />
+                            </div>
+
+                            <button type="button"
+                                    class="btn btn-outline-danger btn-sm"
+                                    @onclick="OpenRemoveImageConfirm">
+                                Удалить изображение
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="question-image-upload">
+                            <InputFile OnChange="HandleImage" class="form-control" />
+                            <small class="text-muted">Максимальный размер файла: 2 МБ</small>
+                        </div>
+                    }
+                </div>
+
+                <div class="survey-field-full">
+                    <div class="question-settings-row @(model.QuestionType == "Rating" ? "question-settings-row-rating" : "")">
+                        <div class="survey-field">
+                            <label class="form-label">Тип вопроса</label>
+                            <select class="form-select"
+                                    value="@model.QuestionType"
+                                    @onchange="e => OnTypeChanged(e.Value?.ToString())">
+                                <option value="">-- Выберите тип вопроса --</option>
+                                <option value="SingleChoice">Один вариант ответа</option>
+                                <option value="MultipleChoice">Несколько вариантов ответа</option>
+                                <option value="Text">Текстовый ответ</option>
+                                <option value="Number">Числовой ответ</option>
+                                <option value="Rating">Рейтинг</option>
+                                <option value="YesNo">Да / Нет</option>
+                            </select>
+
+                            @if (!string.IsNullOrWhiteSpace(model.QuestionType))
+                            {
+                                <div class="question-type-hint">
+                                    @GetQuestionTypeDescription(model.QuestionType)
+                                </div>
+                            }
+                        </div>
+
+                        @if (SupportsCorrectAnswer(model.QuestionType))
+                        {
+                            <div class="survey-field survey-field-correct-answer">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="form-check survey-check survey-check-inline">
+                                    <input class="form-check-input" type="checkbox" @bind="model.HasCorrectAnswer" id="hasCorrectAnswer" />
+                                    <label class="form-check-label" for="hasCorrectAnswer">
+                                        Есть правильный ответ
+                                    </label>
+                                </div>
+                            </div>
+                        }
+
+                        @if (model.QuestionType == "Rating")
+                        {
+                            <div class="survey-field survey-field-rating">
+                                <label class="form-label">Минимум</label>
+                                <input class="form-control rating-number-input" type="number" @bind="model.RatingMin" />
+                            </div>
+
+                            <div class="survey-field survey-field-rating">
+                                <label class="form-label">Максимум</label>
+                                <input class="form-control rating-number-input" type="number" @bind="model.RatingMax" />
+                            </div>
+                        }
                     </div>
                 </div>
-            }
 
-            <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" @bind="model.IsRequired" id="isRequired" />
-                <label class="form-check-label" for="isRequired">
-                    Обязательный вопрос
-                </label>
+                <div class="survey-options-row survey-field-full">
+                    <div class="form-check survey-check">
+                        <input class="form-check-input" type="checkbox" @bind="model.IsRequired" id="isRequired" />
+                        <label class="form-check-label" for="isRequired">
+                            Обязательный вопрос
+                        </label>
+                    </div>
+                </div>
             </div>
+        </section>
 
-            <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" @bind="model.HasCorrectAnswer" id="hasCorrectAnswer" />
-                <label class="form-check-label" for="hasCorrectAnswer">
-                    Есть правильный ответ
-                </label>
-            </div>
+        @if (RequiresOptions(model.QuestionType))
+        {
+            <section class="survey-section-card">
+                <div class="question-options-header">
+                    <h6 class="question-options-title">Варианты ответа</h6>
 
-            @if (RequiresOptions(model.QuestionType))
-            {
-                <h5 class="mt-4">Варианты ответа</h5>
+                    @if (model.QuestionType != "YesNo")
+                    {
+                        <button type="button"
+                                class="btn btn-outline-primary btn-sm"
+                                @onclick="AddOption">
+                            Добавить вариант
+                        </button>
+                    }
+                </div>
 
                 @if (model.Options.Count == 0)
                 {
-                    <p class="text-muted">Нет вариантов ответа.</p>
+                    <div class="question-options-empty">Нет вариантов ответа.</div>
                 }
 
                 @for (int i = 0; i < model.Options.Count; i++)
@@ -150,35 +168,56 @@ else
                     var optionIndex = i;
                     var option = model.Options[optionIndex];
 
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
+                    <div class="question-option-row @(model.HasCorrectAnswer ? "question-option-row-with-correct" : "question-option-row-no-correct")">
+                        <div class="question-option-sort">
+                            <div class="survey-order-controls option-order-controls-vertical">
+                                @if (optionIndex > 0)
+                                {
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                            title="Поднять вариант"
+                                            @onclick="() => MoveOptionUp(optionIndex)">
+                                        ↑
+                                    </button>
+                                }
+
+                                @if (optionIndex < model.Options.Count - 1)
+                                {
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm order-arrow-btn"
+                                            title="Опустить вариант"
+                                            @onclick="() => MoveOptionDown(optionIndex)">
+                                        ↓
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="question-option-main">
+                            <label class="form-label small-label">Текст варианта №@(optionIndex + 1)</label>
                             <input class="form-control"
                                    placeholder="Текст варианта"
                                    @bind="option.Text" />
                         </div>
 
-                        <div class="col-md-2">
-                            <input class="form-control"
-                                   type="number"
-                                   @bind="option.Order" />
-                        </div>
-
-                        <div class="col-md-2">
-                            @if (model.HasCorrectAnswer)
-                            {
-                                <div class="form-check">
+                        @if (model.HasCorrectAnswer)
+                        {
+                            <div class="question-option-correct">
+                                <label class="form-label small-label d-block">Правильный ответ</label>
+                                <div class="form-check mt-2">
                                     <input class="form-check-input"
                                            type="checkbox"
                                            @bind="option.IsCorrect"
                                            id="@($"correct_{optionIndex}")" />
                                     <label class="form-check-label" for="@($"correct_{optionIndex}")">
-                                        Правильный
+                                        Да
                                     </label>
                                 </div>
-                            }
-                        </div>
+                            </div>
+                        }
 
-                        <div class="col-md-2">
+                        <div class="question-option-actions">
+                            <label class="form-label small-label d-block">&nbsp;</label>
                             <button type="button"
                                     class="btn btn-outline-danger w-100"
                                     @onclick="() => RemoveOption(optionIndex)"
@@ -188,29 +227,51 @@ else
                         </div>
                     </div>
                 }
+            </section>
+        }
 
-                @if (model.QuestionType != "YesNo")
-                {
-                    <button type="button"
-                            class="btn btn-outline-primary btn-sm"
-                            @onclick="AddOption">
-                        Добавить вариант
-                    </button>
-                }
-            }
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger survey-bottom-alert">@errorMessage</div>
+        }
 
-            <div class="mt-4 d-flex gap-2">
+        <div class="survey-bottom-actions survey-bottom-actions-inline">
+            <div class="survey-bottom-actions-left"></div>
+
+            <div class="survey-bottom-actions-center">
                 <button type="button"
-                        class="btn btn-success"
+                        class="btn btn-success survey-save-btn"
                         @onclick="Save"
                         disabled="@isSaving">
                     @(isSaving ? "Сохранение..." : "Сохранить")
                 </button>
+            </div>
 
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        @onclick="GoBack">
-                    Назад
+            <div class="survey-bottom-actions-right"></div>
+        </div>
+    </div>
+}
+
+@if (showRemoveImageConfirmModal)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
+                <h4 class="mb-0">Удаление изображения</h4>
+                <button type="button" class="btn-close" @onclick="CloseRemoveImageConfirm"></button>
+            </div>
+
+            <div class="survey-modal-body">
+                <p class="mb-0">Вы действительно хотите удалить изображение вопроса?</p>
+            </div>
+
+            <div class="survey-modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseRemoveImageConfirm">
+                    Отмена
+                </button>
+
+                <button type="button" class="btn btn-danger" @onclick="ConfirmRemoveImage">
+                    Удалить
                 </button>
             </div>
         </div>
@@ -226,6 +287,7 @@ else
     private bool isLoading = true;
     private bool isSaving;
     private string? errorMessage;
+    private bool showRemoveImageConfirmModal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -279,6 +341,35 @@ else
             return;
 
         model.Options.RemoveAt(index);
+        RecalculateOptionOrders();
+    }
+
+    private void MoveOptionUp(int index)
+    {
+        if (model == null || index <= 0 || index >= model.Options.Count)
+            return;
+
+        var item = model.Options[index];
+        model.Options.RemoveAt(index);
+        model.Options.Insert(index - 1, item);
+        RecalculateOptionOrders();
+    }
+
+    private void MoveOptionDown(int index)
+    {
+        if (model == null || index < 0 || index >= model.Options.Count - 1)
+            return;
+
+        var item = model.Options[index];
+        model.Options.RemoveAt(index);
+        model.Options.Insert(index + 1, item);
+        RecalculateOptionOrders();
+    }
+
+    private void RecalculateOptionOrders()
+    {
+        if (model is null)
+            return;
 
         for (int i = 0; i < model.Options.Count; i++)
         {
@@ -313,12 +404,23 @@ else
         }
     }
 
-    private void RemoveImage()
+    private void OpenRemoveImageConfirm()
+    {
+        showRemoveImageConfirmModal = true;
+    }
+
+    private void CloseRemoveImageConfirm()
+    {
+        showRemoveImageConfirmModal = false;
+    }
+
+    private void ConfirmRemoveImage()
     {
         if (model is null)
             return;
 
         model.Image = null;
+        showRemoveImageConfirmModal = false;
     }
 
     private void OnTypeChanged(string? type)
@@ -353,15 +455,24 @@ else
             model.Options.Clear();
             model.RatingMin = 1;
             model.RatingMax = 5;
+            model.HasCorrectAnswer = false;
             return;
         }
 
         model.Options.Clear();
         model.RatingMin = null;
         model.RatingMax = null;
+        model.HasCorrectAnswer = false;
     }
 
     private bool RequiresOptions(string type)
+    {
+        return type == "SingleChoice"
+            || type == "MultipleChoice"
+            || type == "YesNo";
+    }
+
+    private bool SupportsCorrectAnswer(string type)
     {
         return type == "SingleChoice"
             || type == "MultipleChoice"
@@ -372,12 +483,12 @@ else
     {
         return questionType switch
         {
-            "SingleChoice" => "Пользователь сможет выбрать только один вариант.",
-            "MultipleChoice" => "Пользователь сможет выбрать несколько вариантов.",
-            "Text" => "Пользователь введёт текстовый ответ.",
-            "Number" => "Пользователь введёт числовое значение.",
-            "Rating" => "Пользователь выберет оценку по шкале.",
-            "YesNo" => "Пользователь выберет один из двух вариантов: Да или Нет.",
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
             _ => string.Empty
         };
     }
@@ -498,10 +609,5 @@ else
         {
             isSaving = false;
         }
-    }
-
-    private void GoBack()
-    {
-        NavigationManager.NavigateTo("/admin/question-bank");
     }
 }
