@@ -1,10 +1,12 @@
 ﻿@page "/admin/question-bank"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
 @using SurveyApp.Server.DTOs.QuestionBank
 @using SurveyApp.Server.Services.Interfaces
 @inject IQuestionBankService QuestionBankService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -12,80 +14,137 @@
 
 <h3 class="mb-4">Банк вопросов</h3>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <input class="form-control"
            style="max-width: 350px;"
            placeholder="Поиск по тексту..."
            @bind="searchText" />
 
-    <button class="btn btn-primary"
-            @onclick="GoToCreate">
-        + Добавить вопрос
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary"
+                @onclick="GoToImport">
+            Импорт
+        </button>
+        
+        <a class="btn btn-outline-success"
+           href="/api/export/question-bank/excel"
+           target="_blank">
+            Экспорт Excel
+        </a>
+
+        <a class="btn btn-outline-secondary"
+           href="/api/export/question-bank/xml"
+           target="_blank">
+            Экспорт XML
+        </a>
+        <button class="btn btn-primary"
+                @onclick="GoToCreate">
+            + Добавить вопрос
+        </button>
+    </div>
 </div>
 
 @if (isLoading)
 {
-    <div class="spinner-border"></div>
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
 }
 else if (!string.IsNullOrWhiteSpace(errorMessage))
 {
     <div class="alert alert-danger">@errorMessage</div>
 }
-else if (FilteredItems.Count == 0)
+else if (GroupedItems.Count == 0)
 {
     <div class="alert alert-secondary">Вопросы не найдены.</div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Текст</th>
-                    <th>Тип</th>
-                    <th>Категория</th>
-                    <th>Создан</th>
-                    <th class="text-end">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in FilteredItems)
-                {
-                    <tr>
-                        <td>@item.Text</td>
-                        <td>@item.QuestionType</td>
-                        <td>@item.Category</td>
-                        <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
-                        <td class="text-end">
-                            <button class="btn btn-outline-primary btn-sm me-2"
-                                    @onclick="() => Edit(item.Id)">
-                                Редактировать
-                            </button>
+    @foreach (var group in GroupedItems)
+    {
+        var category = group.Key;
+        var isExpanded = expandedCategories.Contains(category);
 
-                            <button class="btn btn-outline-danger btn-sm"
-                                    @onclick="() => Delete(item.Id)">
-                                Удалить
-                            </button>
-                        </td>
-                    </tr>
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body">
+                <button type="button"
+                        class="btn w-100 text-start p-0 border-0 bg-transparent"
+                        @onclick="() => ToggleCategory(category)">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold" style="width: 20px;">
+                                @(isExpanded ? "▼" : "▶")
+                            </span>
+
+                            <div>
+                                <h5 class="mb-1">@category</h5>
+                                <small class="text-muted">Вопросов: @group.Value.Count</small>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+
+                @if (isExpanded)
+                {
+                    <div class="table-responsive mt-3">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Текст</th>
+                                    <th>Тип</th>
+                                    <th>Создан</th>
+                                    <th class="text-end">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in group.Value)
+                                {
+                                    <tr>
+                                        <td>@item.Text</td>
+                                        <td>@GetQuestionTypeLabel(item.QuestionType)</td>
+                                        <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-outline-primary btn-sm me-2"
+                                                    @onclick="() => Edit(item.Id)">
+                                                Редактировать
+                                            </button>
+
+                                            <button class="btn btn-outline-danger btn-sm"
+                                                    @onclick="() => Delete(item.Id)">
+                                                Удалить
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 }
-            </tbody>
-        </table>
-    </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
     private List<QuestionBankItemDto> items = new();
     private bool isLoading = true;
     private string? errorMessage;
-    private string searchText = "";
+    private string searchText = string.Empty;
 
-    private List<QuestionBankItemDto> FilteredItems =>
-        items.Where(i =>
-            string.IsNullOrWhiteSpace(searchText) ||
-            i.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-        .ToList();
+    private HashSet<string> expandedCategories = new();
+
+    private Dictionary<string, List<QuestionBankItemDto>> GroupedItems =>
+        items
+            .Where(i => string.IsNullOrWhiteSpace(searchText)
+                || i.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(i.Category) &&
+                    i.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
+            .GroupBy(i => string.IsNullOrWhiteSpace(i.Category) ? "Без категории" : i.Category!)
+            .OrderBy(g => g.Key)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(x => x.Text).ToList()
+            );
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,11 +156,14 @@ else
         try
         {
             isLoading = true;
+            errorMessage = null;
             items = await QuestionBankService.GetAllAsync();
+
+            expandedCategories.Clear();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = $"Ошибка загрузки: {ex.Message}";
         }
         finally
         {
@@ -109,9 +171,22 @@ else
         }
     }
 
+    private void ToggleCategory(string category)
+    {
+        if (expandedCategories.Contains(category))
+            expandedCategories.Remove(category);
+        else
+            expandedCategories.Add(category);
+    }
+
     private void GoToCreate()
     {
         NavigationManager.NavigateTo("/admin/question-bank/create");
+    }
+
+    private void GoToImport()
+    {
+        NavigationManager.NavigateTo("/admin/question-bank/import");
     }
 
     private void Edit(int id)
@@ -129,5 +204,17 @@ else
         await Load();
     }
 
-    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private string GetQuestionTypeLabel(string type)
+    {
+        return type switch
+        {
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
+            _ => type
+        };
+    }
 }

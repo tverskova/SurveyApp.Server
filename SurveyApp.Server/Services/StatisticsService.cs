@@ -1,7 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using SurveyApp.Server.Data;
 using SurveyApp.Server.DTOs.Statistics;
 using SurveyApp.Server.Services.Interfaces;
+using System.Globalization;
+using System.Text;
 
 namespace SurveyApp.Server.Services
 {
@@ -227,6 +233,384 @@ namespace SurveyApp.Server.Services
                 .ToList();
         }
 
+
+        public async Task<byte[]> ExportSurveyStatisticsToPdfAsync(int surveyId)
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            var statistics = await GetSurveyStatisticsAsync(surveyId);
+
+            if (statistics == null)
+                throw new Exception("Опрос не найден.");
+
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Margin(30);
+
+                    page.Header()
+                        .Column(col =>
+                        {
+                            col.Item().Text($"Статистика опроса: {statistics.Title}")
+                                .FontSize(18)
+                                .Bold();
+
+                            col.Item().Text($"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}")
+                                .FontSize(10)
+                                .FontColor(Colors.Grey.Darken1);
+                        });
+
+                    page.Content().Column(col =>
+                    {
+                        col.Spacing(12);
+
+                        col.Item().Border(1).Padding(10).Column(summary =>
+                        {
+                            summary.Spacing(4);
+                            summary.Item().Text($"Всего прохождений: {statistics.TotalResponses}");
+
+                            if (statistics.AverageCompletionTimeSeconds > 0)
+                                summary.Item().Text($"Среднее время прохождения: {Math.Round(statistics.AverageCompletionTimeSeconds)} сек.");
+
+                            if (statistics.FirstResponseDate.HasValue)
+                                summary.Item().Text($"Первый ответ: {statistics.FirstResponseDate.Value.ToLocalTime():dd.MM.yyyy HH:mm}");
+
+                            if (statistics.LastResponseDate.HasValue)
+                                summary.Item().Text($"Последний ответ: {statistics.LastResponseDate.Value.ToLocalTime():dd.MM.yyyy HH:mm}");
+                        });
+
+                        for (int i = 0; i < statistics.Questions.Count; i++)
+                        {
+                            var question = statistics.Questions[i];
+
+                            col.Item().Border(1).Padding(10).Column(q =>
+                            {
+                                q.Spacing(8);
+
+                                q.Item().Text($"{i + 1}. {question.Text}")
+                                    .Bold()
+                                    .FontSize(13);
+
+                                q.Item().Text($"Тип: {question.Type}")
+                                    .FontSize(10)
+                                    .FontColor(Colors.Grey.Darken1);
+
+                                if (question.Type == "Text")
+                                {
+                                    if (question.TextAnswers.Any())
+                                    {
+                                        foreach (var answer in question.TextAnswers)
+                                            q.Item().Text($"• {answer}");
+                                    }
+                                    else
+                                    {
+                                        q.Item().Text("Нет текстовых ответов.");
+                                    }
+                                }
+                                else
+                                {
+                                    if (question.Labels.Any() && question.Values.Any())
+                                    {
+                                        var svg = question.Type == "YesNo"
+                                            ? GeneratePieChartSvg(question.Labels, question.Values)
+                                            : GenerateBarChartSvg(question.Labels, question.Values);
+
+                                        q.Item()
+                                            .AlignCenter()
+                                            .Width(480)
+                                            .Svg(svg);
+
+                                        q.Item().PaddingTop(4).Column(statsCol =>
+                                        {
+                                            statsCol.Spacing(2);
+
+                                            for (int j = 0; j < question.Labels.Count; j++)
+                                                statsCol.Item().Text($"{question.Labels[j]}: {question.Values[j]}");
+
+                                            if (question.AverageValue.HasValue)
+                                                statsCol.Item().Text($"Среднее: {question.AverageValue:F2}");
+
+                                            if (question.MinValue.HasValue)
+                                                statsCol.Item().Text($"Минимум: {question.MinValue}");
+
+                                            if (question.MaxValue.HasValue)
+                                                statsCol.Item().Text($"Максимум: {question.MaxValue}");
+                                        });
+                                    }
+                                    else
+                                    {
+                                        q.Item().Text("Нет данных для построения диаграммы.");
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    page.Footer()
+                        .AlignCenter()
+                        .Text(x =>
+                        {
+                            x.Span("Отчёт по статистике опроса");
+                        });
+                });
+            });
+
+            return document.GeneratePdf();
+        }
+
+        public async Task<byte[]> ExportSurveyStatisticsToExcelAsync(int surveyId)
+        {
+            var statistics = await GetSurveyStatisticsAsync(surveyId);
+
+            if (statistics == null)
+                throw new Exception("Опрос не найден.");
+
+            using var workbook = new XLWorkbook();
+
+            // 🔹 Лист 1 — Общая информация
+            var summarySheet = workbook.Worksheets.Add("Общая информация");
+
+            summarySheet.Cell(1, 1).Value = "Название опроса";
+            summarySheet.Cell(1, 2).Value = statistics.Title;
+
+            summarySheet.Cell(2, 1).Value = "Всего прохождений";
+            summarySheet.Cell(2, 2).Value = statistics.TotalResponses;
+
+            summarySheet.Cell(3, 1).Value = "Среднее время (сек)";
+            summarySheet.Cell(3, 2).Value = Math.Round(statistics.AverageCompletionTimeSeconds);
+
+            summarySheet.Cell(4, 1).Value = "Первый ответ";
+            summarySheet.Cell(4, 2).Value = statistics.FirstResponseDate?.ToLocalTime();
+
+            summarySheet.Cell(5, 1).Value = "Последний ответ";
+            summarySheet.Cell(5, 2).Value = statistics.LastResponseDate?.ToLocalTime();
+
+            summarySheet.Columns().AdjustToContents();
+
+            // 🔹 Листы по каждому вопросу
+            for (int i = 0; i < statistics.Questions.Count; i++)
+            {
+                var question = statistics.Questions[i];
+                var sheetName = $"Вопрос_{i + 1}";
+                var ws = workbook.Worksheets.Add(sheetName);
+
+                ws.Cell(1, 1).Value = "Вопрос";
+                ws.Cell(1, 2).Value = question.Text;
+
+                ws.Cell(2, 1).Value = "Тип";
+                ws.Cell(2, 2).Value = question.Type;
+
+                int row = 4;
+
+                if (question.Type == "Text")
+                {
+                    ws.Cell(row, 1).Value = "Текстовые ответы";
+                    row++;
+
+                    if (question.TextAnswers.Any())
+                    {
+                        foreach (var answer in question.TextAnswers)
+                        {
+                            ws.Cell(row, 1).Value = answer;
+                            row++;
+                        }
+                    }
+                    else
+                    {
+                        ws.Cell(row, 1).Value = "Нет ответов";
+                    }
+                }
+                else
+                {
+                    ws.Cell(row, 1).Value = "Вариант";
+                    ws.Cell(row, 2).Value = "Количество";
+                    row++;
+
+                    for (int j = 0; j < question.Labels.Count; j++)
+                    {
+                        ws.Cell(row, 1).Value = question.Labels[j];
+                        ws.Cell(row, 2).Value = question.Values[j];
+                        row++;
+                    }
+
+                    if (question.AverageValue.HasValue)
+                    {
+                        row++;
+                        ws.Cell(row, 1).Value = "Среднее";
+                        ws.Cell(row, 2).Value = question.AverageValue.Value;
+                    }
+                }
+
+                ws.Columns().AdjustToContents();
+            }
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }        
+        private static string GenerateBarChartSvg(List<string> labels, List<int> values)
+        {
+            const int width = 480;
+            const int height = 170;
+            const int marginLeft = 50;
+            const int marginRight = 20;
+            const int marginTop = 20;
+            const int marginBottom = 60;
+
+            int chartWidth = width - marginLeft - marginRight;
+            int chartHeight = height - marginTop - marginBottom;
+
+            int maxValue = Math.Max(values.DefaultIfEmpty(0).Max(), 1);
+            double barWidth = labels.Count > 0 ? chartWidth / (double)labels.Count : chartWidth;
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"""
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">
+  <rect width="100%" height="100%" fill="white"/>
+  <line x1="{marginLeft}" y1="{marginTop + chartHeight}" x2="{marginLeft + chartWidth}" y2="{marginTop + chartHeight}" stroke="black" stroke-width="1"/>
+  <line x1="{marginLeft}" y1="{marginTop}" x2="{marginLeft}" y2="{marginTop + chartHeight}" stroke="black" stroke-width="1"/>
+""");
+
+            for (int i = 0; i < labels.Count; i++)
+            {
+                double value = values[i];
+                double normalized = value / maxValue;
+                double h = normalized * chartHeight;
+                double x = marginLeft + i * barWidth + 10;
+                double y = marginTop + chartHeight - h;
+                double w = Math.Max(barWidth - 20, 10);
+
+                string safeLabel = EscapeXml(TrimLabel(labels[i], 18));
+
+                sb.AppendLine($"""
+  <rect x="{x.ToString(CultureInfo.InvariantCulture)}"
+        y="{y.ToString(CultureInfo.InvariantCulture)}"
+        width="{w.ToString(CultureInfo.InvariantCulture)}"
+        height="{h.ToString(CultureInfo.InvariantCulture)}"
+        fill="#4e73df"/>
+  <text x="{(x + w / 2).ToString(CultureInfo.InvariantCulture)}"
+        y="{(y - 5).ToString(CultureInfo.InvariantCulture)}"
+        text-anchor="middle"
+        font-size="11"
+        fill="black">{value}</text>
+  <text x="{(x + w / 2).ToString(CultureInfo.InvariantCulture)}"
+        y="{(marginTop + chartHeight + 18).ToString(CultureInfo.InvariantCulture)}"
+        text-anchor="middle"
+        font-size="10"
+        fill="black">{safeLabel}</text>
+""");
+            }
+
+            sb.AppendLine("</svg>");
+            return sb.ToString();
+        }
+        private static string GeneratePieChartSvg(List<string> labels, List<int> values)
+        {
+            const int width = 480;
+            const int height = 170;
+            const int cx = 110;
+            const int cy = 85;
+            const int radius = 50;
+
+            var colors = new[]
+            {
+        "#4e73df",
+        "#1cc88a",
+        "#36b9cc",
+        "#f6c23e",
+        "#e74a3b",
+        "#858796"
+    };
+
+            int total = values.Sum();
+            if (total <= 0)
+                total = 1;
+
+            double startAngle = -90;
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"""
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">
+  <rect width="100%" height="100%" fill="white"/>
+""");
+
+            for (int i = 0; i < values.Count; i++)
+            {
+                double sweep = values[i] * 360.0 / total;
+                double endAngle = startAngle + sweep;
+
+                string path = DescribePieSlice(cx, cy, radius, startAngle, endAngle);
+                string color = colors[i % colors.Length];
+
+                sb.AppendLine($"""  <path d="{path}" fill="{color}" stroke="white" stroke-width="1"/>""");
+
+                startAngle = endAngle;
+            }
+
+            int legendX = 210;
+            int legendY = 30;
+
+            for (int i = 0; i < labels.Count; i++)
+            {
+                string color = colors[i % colors.Length];
+                string label = EscapeXml(labels[i]);
+                int y = legendY + i * 24;
+
+                sb.AppendLine($"""
+  <rect x="{legendX}" y="{y}" width="14" height="14" fill="{color}"/>
+  <text x="{legendX + 22}" y="{y + 12}" font-size="12" fill="black">{label}: {values[i]}</text>
+""");
+            }
+
+            sb.AppendLine("</svg>");
+            return sb.ToString();
+        }
+        private static string DescribePieSlice(double cx, double cy, double r, double startAngle, double endAngle)
+        {
+            var start = PolarToCartesian(cx, cy, r, endAngle);
+            var end = PolarToCartesian(cx, cy, r, startAngle);
+
+            int largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "M {0} {1} L {2} {3} A {4} {4} 0 {5} 0 {6} {7} Z",
+                cx, cy,
+                start.X, start.Y,
+                r,
+                largeArcFlag,
+                end.X, end.Y
+            );
+        }
+
+        private static (double X, double Y) PolarToCartesian(double cx, double cy, double r, double angleInDegrees)
+        {
+            double angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+            return (
+                cx + (r * Math.Cos(angleInRadians)),
+                cy + (r * Math.Sin(angleInRadians))
+            );
+        }
+        private static string EscapeXml(string text)
+        {
+            return text
+                .Replace("&", "&amp;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;")
+                .Replace("\"", "&quot;")
+                .Replace("'", "&apos;");
+        }
+
+        private static string TrimLabel(string text, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            return text.Length <= maxLength ? text : text[..maxLength] + "...";
+        }
 
     }
 }

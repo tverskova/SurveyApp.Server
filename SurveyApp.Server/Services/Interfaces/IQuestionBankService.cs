@@ -12,5 +12,11 @@ namespace SurveyApp.Server.Services.Interfaces
         Task<bool> DeleteAsync(int id);
 
         Task<CreateQuestionDto?> ConvertToSurveyQuestionAsync(int id);
+
+        Task<List<ImportQuestionBankPreviewDto>> PreviewImportFromExcelAsync(Stream stream);
+        Task<List<ImportQuestionBankPreviewDto>> PreviewImportFromXmlAsync(Stream stream);
+        Task<int> SaveImportedQuestionsAsync(List<ImportQuestionBankPreviewDto> items);
+        Task<byte[]> ExportToExcelAsync();
+        Task<byte[]> ExportToXmlAsync();
     }
 }

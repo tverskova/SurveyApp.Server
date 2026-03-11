@@ -6,5 +6,7 @@ namespace SurveyApp.Server.Services.Interfaces
     {
         Task<SystemStatisticsDto> GetSystemStatisticsAsync();
         Task<SurveyStatisticsDto?> GetSurveyStatisticsAsync(int surveyId);
+        Task<byte[]> ExportSurveyStatisticsToPdfAsync(int surveyId);
+        Task<byte[]> ExportSurveyStatisticsToExcelAsync(int surveyId);
     }
 }

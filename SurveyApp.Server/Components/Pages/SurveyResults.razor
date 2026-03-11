@@ -12,10 +12,23 @@
 
 <PageTitle>Результаты опроса</PageTitle>
 
-<button class="btn btn-outline-secondary mb-3"
-        @onclick="GoBack">
-    ← Назад
-</button>
+<div class="mb-3 d-flex gap-2">
+    <button class="btn btn-outline-secondary"
+            @onclick="GoBack">
+        ← Назад
+    </button>
+
+    <a class="btn btn-outline-danger"
+       href="@($"/api/export/statistics/{SurveyId}/pdf")"
+       target="_blank">
+        Экспорт PDF
+    </a>
+    <a class="btn btn-outline-success"
+       href="@($"/api/export/statistics/{SurveyId}/excel")"
+       target="_blank">
+        Экспорт Excel
+    </a>
+</div>
 
 @if (isLoading)
 {

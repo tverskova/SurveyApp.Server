@@ -254,69 +254,13 @@ else
         </div>
     }
 
-    @if (showQuestionBank)
-    {
-        <div class="card mb-4 shadow-sm border-0">
-            <div class="card-body">
-                <h5 class="mb-3">Банк вопросов</h5>
-
-                <div class="mb-3">
-                    <input class="form-control"
-                           placeholder="Поиск по тексту вопроса..."
-                           @bind="questionBankSearch" />
-                </div>
-
-                @if (questionBankItems.Count == 0)
-                {
-                    <p class="text-muted mb-0">В банке пока нет вопросов.</p>
-                }
-                else if (FilteredQuestionBankItems.Count == 0)
-                {
-                    <p class="text-muted mb-0">По вашему запросу ничего не найдено.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Текст</th>
-                                    <th>Тип</th>
-                                    <th>Категория</th>
-                                    <th class="text-end">Действие</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var item in FilteredQuestionBankItems)
-                                {
-                                    <tr>
-                                        <td>@item.Text</td>
-                                        <td>@GetQuestionTypeDescription(item.QuestionType)</td>
-                                        <td>@item.Category</td>
-                                        <td class="text-end">
-                                            <button type="button"
-                                                    class="btn btn-outline-success btn-sm"
-                                                    @onclick="() => AddQuestionFromBank(item.Id)">
-                                                Добавить
-                                            </button>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-        </div>
-    }
-
     <div class="mb-3">
         <button type="button" class="btn btn-secondary me-2" @onclick="AddQuestion">
             Добавить вопрос
         </button>
 
-        <button type="button" class="btn btn-outline-primary me-2" @onclick="ToggleQuestionBank">
-            @(showQuestionBank ? "Скрыть банк вопросов" : "Добавить из банка")
+        <button type="button" class="btn btn-outline-primary me-2" @onclick="OpenQuestionBankModal">
+            Добавить из банка
         </button>
 
         <button type="button" class="btn btn-success me-2" @onclick="SaveSurvey" disabled="@isSaving">
@@ -326,6 +270,151 @@ else
         <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
             Назад
         </button>
+    </div>
+}
+
+@if (showQuestionBankModal)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
+         style="z-index: 1050;">
+        <div class="bg-white rounded shadow p-4"
+             style="width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto;">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Банк вопросов</h4>
+                <button type="button" class="btn-close" @onclick="CloseQuestionBankModal"></button>
+            </div>
+
+            <div class="mb-3">
+                <input class="form-control"
+                       placeholder="Поиск по тексту вопроса..."
+                       @bind="questionBankSearch" />
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <h6>Категории</h6>
+
+                    <div class="list-group">
+                        @foreach (var category in questionBankCategories)
+                        {
+                            <button type="button"
+                                    class="list-group-item list-group-item-action @(selectedCategory == category ? "active" : "")"
+                                    @onclick="() => SelectCategory(category)">
+                                @category
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-md-8">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Вопросы</h6>
+
+                        @if (!string.IsNullOrWhiteSpace(selectedCategory))
+                        {
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-success btn-sm"
+                                        @onclick="() => SelectAllInCategory(selectedCategory)">
+                                    Выбрать все
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @onclick="() => ClearCategorySelection(selectedCategory)">
+                                    Снять выбор
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    @if (FilteredQuestionBankItems.Count == 0)
+                    {
+                        <p class="text-muted">Нет вопросов для отображения.</p>
+                    }
+                    else
+                    {
+                        @foreach (var item in FilteredQuestionBankItems)
+                        {
+                            <div class="card mb-2">
+                                <div class="card-body py-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               checked="@selectedQuestionBankIds.Contains(item.Id)"
+                                               @onchange="e => ToggleQuestionBankSelection(item.Id, e.Value as bool? == true)"
+                                               id="@($"edit_bank_{item.Id}")" />
+
+                                        <label class="form-check-label w-100" for="@($"edit_bank_{item.Id}")">
+                                            <span class="fw-semibold d-block">@item.Text</span>
+                                            <span class="small text-muted">
+                                                Тип: @GetQuestionTypeDescription(item.QuestionType)
+                                                @if (!string.IsNullOrWhiteSpace(item.Category))
+                                                {
+                                                    <span> | Категория: @item.Category</span>
+                                                }
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseQuestionBankModal">
+                    Отмена
+                </button>
+
+                <button type="button" class="btn btn-primary" @onclick="OpenQuestionBankConfirmModal">
+                    Сохранить выбор
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showQuestionBankConfirmModal)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex justify-content-center align-items-center"
+         style="z-index: 1060;">
+        <div class="bg-white rounded shadow p-4"
+             style="width: 95%; max-width: 700px; max-height: 85vh; overflow-y: auto;">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Подтверждение добавления</h4>
+                <button type="button" class="btn-close" @onclick="CloseQuestionBankConfirmModal"></button>
+            </div>
+
+            @if (selectedQuestionBankPreview.Count == 0)
+            {
+                <p class="text-muted">Вы не выбрали ни одного вопроса.</p>
+            }
+            else
+            {
+                <p>Будут добавлены следующие вопросы:</p>
+
+                <ol class="mb-3">
+                    @foreach (var item in selectedQuestionBankPreview)
+                    {
+                        <li>@item.Text</li>
+                    }
+                </ol>
+            }
+
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseQuestionBankConfirmModal">
+                    Назад
+                </button>
+
+                <button type="button" class="btn btn-success" @onclick="ConfirmAddQuestionsFromBank">
+                    Подтвердить
+                </button>
+            </div>
+        </div>
     </div>
 }
 
@@ -343,14 +432,23 @@ else
     private bool isSaving;
     private bool isLoading = true;
 
-    private bool showQuestionBank;
-    private string questionBankSearch = string.Empty;
     private List<QuestionBankItemDto> questionBankItems = new();
+    private List<string> questionBankCategories = new();
+    private string? selectedCategory;
+    private string questionBankSearch = string.Empty;
+
+    private bool showQuestionBankModal;
+    private bool showQuestionBankConfirmModal;
+
+    private HashSet<int> selectedQuestionBankIds = new();
+    private List<QuestionBankItemDto> selectedQuestionBankPreview = new();
 
     private List<QuestionBankItemDto> FilteredQuestionBankItems =>
         questionBankItems
-            .Where(q => string.IsNullOrWhiteSpace(questionBankSearch)
-                || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase))
+            .Where(q =>
+                (string.IsNullOrWhiteSpace(selectedCategory) || GetSafeCategory(q.Category) == selectedCategory) &&
+                (string.IsNullOrWhiteSpace(questionBankSearch) || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(q => q.Text)
             .ToList();
 
     protected override async Task OnInitializedAsync()
@@ -393,6 +491,14 @@ else
         try
         {
             questionBankItems = await QuestionBankService.GetAllAsync();
+
+            questionBankCategories = questionBankItems
+                .Select(q => GetSafeCategory(q.Category))
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+
+            selectedCategory = questionBankCategories.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -400,29 +506,95 @@ else
         }
     }
 
-    private void ToggleQuestionBank()
+    private string GetSafeCategory(string? category)
     {
-        showQuestionBank = !showQuestionBank;
+        return string.IsNullOrWhiteSpace(category) ? "Без категории" : category;
     }
 
-    private async Task AddQuestionFromBank(int questionBankId)
+    private void SelectCategory(string category)
+    {
+        selectedCategory = category;
+    }
+
+    private void ToggleQuestionBankSelection(int id, bool isSelected)
+    {
+        if (isSelected)
+            selectedQuestionBankIds.Add(id);
+        else
+            selectedQuestionBankIds.Remove(id);
+    }
+
+    private void SelectAllInCategory(string category)
+    {
+        var ids = questionBankItems
+            .Where(q => GetSafeCategory(q.Category) == category)
+            .Where(q => string.IsNullOrWhiteSpace(questionBankSearch) || q.Text.Contains(questionBankSearch, StringComparison.OrdinalIgnoreCase))
+            .Select(q => q.Id);
+
+        foreach (var id in ids)
+            selectedQuestionBankIds.Add(id);
+    }
+
+    private void ClearCategorySelection(string category)
+    {
+        var ids = questionBankItems
+            .Where(q => GetSafeCategory(q.Category) == category)
+            .Select(q => q.Id)
+            .ToList();
+
+        foreach (var id in ids)
+            selectedQuestionBankIds.Remove(id);
+    }
+
+    private void OpenQuestionBankModal()
+    {
+        showQuestionBankModal = true;
+    }
+
+    private void CloseQuestionBankModal()
+    {
+        showQuestionBankModal = false;
+        questionBankSearch = string.Empty;
+    }
+
+    private void OpenQuestionBankConfirmModal()
+    {
+        selectedQuestionBankPreview = questionBankItems
+            .Where(q => selectedQuestionBankIds.Contains(q.Id))
+            .OrderBy(q => q.Text)
+            .ToList();
+
+        showQuestionBankConfirmModal = true;
+    }
+
+    private void CloseQuestionBankConfirmModal()
+    {
+        showQuestionBankConfirmModal = false;
+    }
+
+    private async Task ConfirmAddQuestionsFromBank()
     {
         try
         {
-            var question = await QuestionBankService.ConvertToSurveyQuestionAsync(questionBankId);
-
-            if (question == null)
+            foreach (var item in selectedQuestionBankPreview)
             {
-                errorMessage = "Не удалось загрузить вопрос из банка.";
-                return;
+                var question = await QuestionBankService.ConvertToSurveyQuestionAsync(item.Id);
+
+                if (question != null)
+                {
+                    question.Order = model.Questions.Count + 1;
+                    model.Questions.Add(question);
+                }
             }
 
-            question.Order = model.Questions.Count + 1;
-            model.Questions.Add(question);
+            selectedQuestionBankIds.Clear();
+            selectedQuestionBankPreview.Clear();
+            showQuestionBankConfirmModal = false;
+            showQuestionBankModal = false;
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при добавлении вопроса из банка: {ex.Message}";
+            errorMessage = $"Ошибка при добавлении вопросов из банка: {ex.Message}";
         }
     }
 
