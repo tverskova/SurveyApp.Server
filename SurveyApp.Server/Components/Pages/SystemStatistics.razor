@@ -10,89 +10,93 @@
 
 <PageTitle>Статистика системы</PageTitle>
 
-<h3 class="mb-4">Статистика системы</h3>
-
-@if (isLoading)
-{
-    <div class="d-flex justify-content-center my-5">
-        <div class="spinner-border" role="status">
-            <span class="visually-hidden">Загрузка...</span>
-        </div>
-    </div>
-}
-else if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-else if (statistics is null)
-{
-    <div class="alert alert-warning">Статистика недоступна.</div>
-}
-else
-{
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                    <div class="text-muted mb-2">Пользователи</div>
-                    <div class="fs-3 fw-bold">@statistics.TotalUsers</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                    <div class="text-muted mb-2">Всего опросов</div>
-                    <div class="fs-3 fw-bold">@statistics.TotalSurveys</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                    <div class="text-muted mb-2">Опубликованные</div>
-                    <div class="fs-3 fw-bold">@statistics.PublishedSurveys</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                    <div class="text-muted mb-2">Всего прохождений</div>
-                    <div class="fs-3 fw-bold">@statistics.TotalResponses</div>
-                </div>
-            </div>
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Статистика системы</h3>
+            <p class="survey-page-subtitle">Общая статистика пользователей, опросов и прохождений</p>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                <h5 class="mb-0">Опросы</h5>
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка статистики...</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (statistics is null)
+    {
+        <div class="alert alert-warning">Статистика недоступна.</div>
+    }
+    else
+    {
+        <section class="statistics-summary-grid">
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Пользователи</div>
+                <div class="statistics-summary-value">@statistics.TotalUsers</div>
+            </div>
 
-                <input class="form-control"
-                       style="max-width: 320px;"
-                       placeholder="Поиск по названию..."
-                       @bind="searchText" />
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Всего опросов</div>
+                <div class="statistics-summary-value">@statistics.TotalSurveys</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Опубликованные</div>
+                <div class="statistics-summary-value">@statistics.PublishedSurveys</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Всего прохождений</div>
+                <div class="statistics-summary-value">@statistics.TotalResponses</div>
+            </div>
+        </section>
+
+        <section class="survey-section-card">
+            <div class="survey-section-header survey-section-header-between statistics-table-header">
+                <div>
+                    <h4 class="survey-section-title">Опросы</h4>
+                    <p class="survey-section-subtitle">Просмотр статистики по каждому опросу</p>
+                </div>
+
+                <div class="search-input-wrap statistics-search-wrap">
+                    <input class="form-control search-input-with-clear"
+                           placeholder="Поиск по названию..."
+                           @bind="searchText" />
+
+                    @if (!string.IsNullOrWhiteSpace(searchText))
+                    {
+                        <button type="button"
+                                class="search-clear-btn"
+                                title="Очистить поиск"
+                                @onclick="ClearSearch">
+                            ✕
+                        </button>
+                    }
+                </div>
             </div>
 
             @if (FilteredSurveys.Count == 0)
             {
-                <p class="text-muted mb-0">Опросы не найдены.</p>
+                <div class="survey-empty-state">
+                    <div class="survey-empty-title">Опросы не найдены</div>
+                    <div class="survey-empty-text">Попробуйте изменить строку поиска.</div>
+                </div>
             }
             else
             {
                 <div class="table-responsive">
-                    <table class="table align-middle">
+                    <table class="table admin-table align-middle">
                         <thead>
                             <tr>
                                 <th>Название</th>
                                 <th>Статус</th>
                                 <th>Прохождения</th>
-                                <th class="text-end">Действия</th>
+                                <th>Действия</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -103,17 +107,17 @@ else
                                     <td>
                                         @if (survey.IsPublished)
                                         {
-                                            <span class="badge bg-success">Опубликован</span>
+                                            <span class="statistics-status statistics-status-published">Опубликован</span>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary">Черновик</span>
+                                            <span class="statistics-status statistics-status-draft">Черновик</span>
                                         }
                                     </td>
                                     <td>@survey.ResponsesCount</td>
-                                    <td class="text-end">
+                                    <td>
                                         <button type="button"
-                                                class="btn btn-outline-primary btn-sm"
+                                                class="btn btn-success btn-sm"
                                                 @onclick="@(() => OpenSurveyResults(survey.SurveyId))">
                                             Аналитика
                                         </button>
@@ -124,9 +128,9 @@ else
                     </table>
                 </div>
             }
-        </div>
-    </div>
-}
+        </section>
+    }
+</div>
 
 @code {
     private SystemStatisticsDto? statistics;
@@ -162,6 +166,11 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void ClearSearch()
+    {
+        searchText = string.Empty;
     }
 
     private void OpenSurveyResults(int surveyId)

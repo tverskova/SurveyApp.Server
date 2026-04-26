@@ -46,6 +46,14 @@ namespace SurveyApp.Server.Data
                     .HasForeignKey<UserProfile>(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.Property(x => x.PhotoContentType)
+                    .HasMaxLength(100);
+
+                entity.HasOne(x => x.User)
+                    .WithOne(x => x.UserProfile)
+                    .HasForeignKey<UserProfile>(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 entity.HasIndex(x => x.UserId)
                     .IsUnique();
             });

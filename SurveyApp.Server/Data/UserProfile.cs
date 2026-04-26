@@ -12,5 +12,8 @@
         public DateTime? BirthDate { get; set; }
         public string? Gender { get; set; }
         public string? City { get; set; }
+
+        public byte[]? Photo { get; set; }
+        public string? PhotoContentType { get; set; }
     }
 }
