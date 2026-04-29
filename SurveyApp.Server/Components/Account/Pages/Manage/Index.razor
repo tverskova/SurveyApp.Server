@@ -1,15 +1,23 @@
 ﻿@page "/Account/Manage"
+@rendermode InteractiveServer
 
 @using System.ComponentModel.DataAnnotations
-@using Microsoft.AspNetCore.Identity
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
 @using SurveyApp.Server.Data
 
+@attribute [Authorize]
+
 @inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
-@inject IdentityRedirectManager RedirectManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Личный кабинет</PageTitle>
 
@@ -22,8 +30,15 @@
 else
 {
     <div class="survey-editor-page">
-        
-        <StatusMessage />
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
 
         <section class="survey-section-card">
             <div class="manage-profile-layout">
@@ -37,19 +52,22 @@ else
                     else
                     {
                         <div class="manage-profile-photo manage-profile-photo-placeholder">
-                            @(GetInitials())
+                            @GetInitials()
                         </div>
                     }
 
                     <div class="manage-profile-photo-actions">
-                        <InputFile OnChange="HandlePhotoSelected" class="form-control" accept="image/*" />
+                        <InputFile OnChange="HandlePhotoSelected"
+                                   class="form-control"
+                                   accept="image/*" />
+
                         <small class="text-muted">Максимальный размер файла: 2 МБ</small>
 
                         @if (profile?.Photo is not null)
                         {
                             <button type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    @onclick="RemovePhoto">
+                                    @onclick="ConfirmAndRemovePhoto">
                                 Удалить фото
                             </button>
                         }
@@ -57,7 +75,7 @@ else
                 </div>
 
                 <div class="manage-profile-form-block">
-                    <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post" class="auth-form">
+                    <EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync" class="auth-form">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-danger mb-3" role="alert" />
 
@@ -72,62 +90,62 @@ else
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.Email" class="form-label">Электронная почта</label>
+                                <label for="email" class="form-label">Электронная почта</label>
                                 <input type="text"
                                        value="@email"
-                                       id="Input.Email"
+                                       id="email"
                                        class="form-control"
                                        disabled />
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.PhoneNumber" class="form-label">Телефон</label>
+                                <label for="phone" class="form-label">Телефон</label>
                                 <InputText @bind-Value="Input.PhoneNumber"
-                                           id="Input.PhoneNumber"
+                                           id="phone"
                                            class="form-control"
-                                           placeholder="Введите номер телефона" />
+                                           placeholder="+7XXXXXXXXXX" />
                                 <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.FirstName" class="form-label">Имя</label>
+                                <label for="firstName" class="form-label">Имя</label>
                                 <InputText @bind-Value="Input.FirstName"
-                                           id="Input.FirstName"
+                                           id="firstName"
                                            class="form-control"
                                            placeholder="Введите имя" />
                                 <ValidationMessage For="() => Input.FirstName" class="text-danger" />
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.LastName" class="form-label">Фамилия</label>
+                                <label for="lastName" class="form-label">Фамилия</label>
                                 <InputText @bind-Value="Input.LastName"
-                                           id="Input.LastName"
+                                           id="lastName"
                                            class="form-control"
                                            placeholder="Введите фамилию" />
                                 <ValidationMessage For="() => Input.LastName" class="text-danger" />
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.BirthDate" class="form-label">Дата рождения</label>
+                                <label for="birthDate" class="form-label">Дата рождения</label>
                                 <InputDate @bind-Value="Input.BirthDate"
-                                           id="Input.BirthDate"
+                                           id="birthDate"
                                            class="form-control" />
                                 <ValidationMessage For="() => Input.BirthDate" class="text-danger" />
                             </div>
 
                             <div class="survey-field">
-                                <label for="Input.Gender" class="form-label">Пол</label>
+                                <label for="gender" class="form-label">Пол</label>
                                 <InputText @bind-Value="Input.Gender"
-                                           id="Input.Gender"
+                                           id="gender"
                                            class="form-control"
-                                           placeholder="Например: Женский / Мужской" />
+                                           placeholder="Женский / Мужской" />
                                 <ValidationMessage For="() => Input.Gender" class="text-danger" />
                             </div>
 
                             <div class="survey-field survey-field-full">
-                                <label for="Input.City" class="form-label">Город</label>
+                                <label for="city" class="form-label">Город</label>
                                 <InputText @bind-Value="Input.City"
-                                           id="Input.City"
+                                           id="city"
                                            class="form-control"
                                            placeholder="Введите город" />
                                 <ValidationMessage For="() => Input.City" class="text-danger" />
@@ -155,28 +173,46 @@ else
 
     private ApplicationUser? user;
     private UserProfile? profile;
+
     private string? username;
     private string? email;
     private string? phoneNumber;
+
     private bool isLoading = true;
+    private string? successMessage;
+    private string? errorMessage;
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
-    [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = default!;
+    private InputModel Input { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
     {
-        Input ??= new();
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var currentUser = authState.User;
+
+        if (currentUser.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
+            return;
+        }
+
+        var userId = UserManager.GetUserId(currentUser);
 
         user = await UserManager.Users
             .Include(u => u.UserProfile)
-            .FirstOrDefaultAsync(u => u.Id == UserManager.GetUserId(HttpContext.User));
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user is null)
         {
-            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
             return;
         }
 
@@ -195,6 +231,8 @@ else
 
             DbContext.UserProfiles.Add(profile);
             await DbContext.SaveChangesAsync();
+
+            user.UserProfile = profile;
         }
 
         Input.PhoneNumber = phoneNumber;
@@ -209,74 +247,140 @@ else
 
     private async Task HandlePhotoSelected(InputFileChangeEventArgs e)
     {
-        if (user is null || profile is null)
-            return;
-
-        var file = e.File;
-        if (file is null)
-            return;
-
-        if (file.Size > MaxPhotoSize)
+        try
         {
-            RedirectManager.RedirectToCurrentPageWithStatus("Ошибка: размер фотографии не должен превышать 2 МБ.", HttpContext);
-            return;
+            errorMessage = null;
+            successMessage = null;
+
+            if (user is null || profile is null)
+                return;
+
+            var file = e.File;
+
+            if (file.Size > MaxPhotoSize)
+            {
+                errorMessage = "Размер фотографии не должен превышать 2 МБ.";
+                return;
+            }
+
+            if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "Можно загружать только изображения.";
+                return;
+            }
+
+            using var stream = file.OpenReadStream(MaxPhotoSize);
+            using var memoryStream = new MemoryStream();
+
+            await stream.CopyToAsync(memoryStream);
+
+            profile.Photo = memoryStream.ToArray();
+            profile.PhotoContentType = file.ContentType;
+
+            DbContext.UserProfiles.Update(profile);
+            await DbContext.SaveChangesAsync();
+
+            successMessage = "Фотография профиля сохранена.";
         }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке фотографии: {ex.Message}";
+        }
+    }
 
-        using var stream = file.OpenReadStream(MaxPhotoSize);
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream);
+    private async Task ConfirmAndRemovePhoto()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            "Вы уверены, что хотите удалить фото профиля?");
 
-        profile.Photo = memoryStream.ToArray();
-        profile.PhotoContentType = file.ContentType;
+        if (!confirmed)
+            return;
 
-        await DbContext.SaveChangesAsync();
-        await SignInManager.RefreshSignInAsync(user);
-        StateHasChanged();
+        await RemovePhoto();
     }
 
     private async Task RemovePhoto()
     {
-        if (user is null || profile is null)
-            return;
+        try
+        {
+            errorMessage = null;
+            successMessage = null;
 
-        profile.Photo = null;
-        profile.PhotoContentType = null;
+            if (user is null || profile is null)
+                return;
 
-        await DbContext.SaveChangesAsync();
-        await SignInManager.RefreshSignInAsync(user);
-        StateHasChanged();
+            profile.Photo = null;
+            profile.PhotoContentType = null;
+
+            DbContext.UserProfiles.Update(profile);
+            await DbContext.SaveChangesAsync();
+
+            successMessage = "Фотография профиля удалена.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при удалении фотографии: {ex.Message}";
+        }
     }
 
     private async Task OnValidSubmitAsync()
     {
-        if (user is null || profile is null)
+        try
         {
-            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
-            return;
-        }
+            errorMessage = null;
+            successMessage = null;
 
-        if (Input.PhoneNumber != phoneNumber)
-        {
-            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
-            if (!setPhoneResult.Succeeded)
-            {
-                RedirectManager.RedirectToCurrentPageWithStatus("Ошибка: не удалось сохранить номер телефона.", HttpContext);
+            if (user is null || profile is null)
                 return;
+
+            NormalizeInput();
+
+            if (Input.PhoneNumber != phoneNumber)
+            {
+                var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
+
+                if (!setPhoneResult.Succeeded)
+                {
+                    errorMessage = "Ошибка: не удалось сохранить номер телефона.";
+                    return;
+                }
+
+                phoneNumber = Input.PhoneNumber;
             }
 
-            phoneNumber = Input.PhoneNumber;
+            profile.FirstName = Input.FirstName;
+            profile.LastName = Input.LastName;
+            profile.BirthDate = Input.BirthDate;
+            profile.Gender = Input.Gender;
+            profile.City = Input.City;
+
+            DbContext.UserProfiles.Update(profile);
+            await DbContext.SaveChangesAsync();
+
+            successMessage = "Профиль успешно обновлён.";
         }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при сохранении профиля: {ex.Message}";
+        }
+    }
 
-        profile.FirstName = Input.FirstName;
-        profile.LastName = Input.LastName;
-        profile.BirthDate = Input.BirthDate;
-        profile.Gender = Input.Gender;
-        profile.City = Input.City;
+    private void NormalizeInput()
+    {
+        Input.PhoneNumber = NormalizeSpaces(Input.PhoneNumber);
+        Input.FirstName = NormalizeSpaces(Input.FirstName);
+        Input.LastName = NormalizeSpaces(Input.LastName);
+        Input.Gender = NormalizeSpaces(Input.Gender);
+        Input.City = NormalizeSpaces(Input.City);
+    }
 
-        await DbContext.SaveChangesAsync();
-        await SignInManager.RefreshSignInAsync(user);
+    private static string? NormalizeSpaces(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
 
-        RedirectManager.RedirectToCurrentPageWithStatus("Профиль успешно обновлён.", HttpContext);
+        return Regex.Replace(value.Trim(), @"\s+", " ");
     }
 
     private string? GetPhotoSrc()
@@ -289,31 +393,63 @@ else
 
     private string GetInitials()
     {
-        var first = string.IsNullOrWhiteSpace(Input.FirstName) ? "" : Input.FirstName.Trim()[0].ToString().ToUpper();
-        var last = string.IsNullOrWhiteSpace(Input.LastName) ? "" : Input.LastName.Trim()[0].ToString().ToUpper();
+        var first = string.IsNullOrWhiteSpace(Input.FirstName)
+            ? string.Empty
+            : Input.FirstName.Trim()[0].ToString().ToUpper();
+
+        var last = string.IsNullOrWhiteSpace(Input.LastName)
+            ? string.Empty
+            : Input.LastName.Trim()[0].ToString().ToUpper();
 
         var initials = $"{first}{last}".Trim();
+
         return string.IsNullOrWhiteSpace(initials) ? "U" : initials;
     }
 
-    private sealed class InputModel
+    private sealed class InputModel : IValidatableObject
     {
-        [Phone(ErrorMessage = "Введите корректный номер телефона.")]
+        [RegularExpression(@"^(\+7|8)\d{10}$", ErrorMessage = "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.")]
         [Display(Name = "Телефон")]
         public string? PhoneNumber { get; set; }
 
         [StringLength(100, ErrorMessage = "Имя не должно превышать 100 символов.")]
+        [RegularExpression(@"^[А-Яа-яЁёA-Za-z\- ]+$", ErrorMessage = "Имя может содержать только буквы, пробелы и дефис.")]
         public string? FirstName { get; set; }
 
         [StringLength(100, ErrorMessage = "Фамилия не должна превышать 100 символов.")]
+        [RegularExpression(@"^[А-Яа-яЁёA-Za-z\- ]+$", ErrorMessage = "Фамилия может содержать только буквы, пробелы и дефис.")]
         public string? LastName { get; set; }
 
         public DateTime? BirthDate { get; set; }
 
         [StringLength(50, ErrorMessage = "Пол не должен превышать 50 символов.")]
+        [RegularExpression(@"^[А-Яа-яЁёA-Za-z\- ]+$", ErrorMessage = "Пол может содержать только буквы, пробелы и дефис.")]
         public string? Gender { get; set; }
 
         [StringLength(100, ErrorMessage = "Город не должен превышать 100 символов.")]
+        [RegularExpression(@"^[А-Яа-яЁёA-Za-z\- ]+$", ErrorMessage = "Город может содержать только буквы, пробелы и дефис.")]
         public string? City { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (BirthDate.HasValue)
+            {
+                var today = DateTime.Today;
+
+                if (BirthDate.Value.Date > today)
+                {
+                    yield return new ValidationResult(
+                        "Дата рождения не может быть позже текущей даты.",
+                        new[] { nameof(BirthDate) });
+                }
+
+                if (BirthDate.Value.Date < today.AddYears(-120))
+                {
+                    yield return new ValidationResult(
+                        "Проверьте корректность даты рождения.",
+                        new[] { nameof(BirthDate) });
+                }
+            }
+        }
     }
 }

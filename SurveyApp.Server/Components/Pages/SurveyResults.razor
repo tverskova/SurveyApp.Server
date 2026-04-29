@@ -1,9 +1,11 @@
 ﻿@page "/admin/results/{SurveyId:int}"
 @rendermode InteractiveServer
+
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
 @using SurveyApp.Server.DTOs.Statistics
 @using SurveyApp.Server.Services.Interfaces
+
 @inject IStatisticsService StatisticsService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -19,13 +21,14 @@
     </button>
 
     <a class="btn btn-outline-danger"
-       href="@($"/api/export/statistics/{SurveyId}/pdf")"
-       target="_blank">
+           href="@($"/api/export/statistics/{SurveyId}/pdf")"
+           target="_blank">
         Экспорт PDF
     </a>
+
     <a class="btn btn-outline-success"
-       href="@($"/api/export/statistics/{SurveyId}/excel")"
-       target="_blank">
+           href="@($"/api/export/statistics/{SurveyId}/excel")"
+           target="_blank">
         Экспорт Excel
     </a>
 </div>
@@ -40,21 +43,30 @@ else if (!string.IsNullOrWhiteSpace(errorMessage))
 }
 else if (statistics is null)
 {
-    <div class="alert alert-warning">Опрос не найден</div>
+    <div class="alert alert-warning">
+        Опрос не найден
+    </div>
 }
 else
 {
     <h3>@statistics.Title</h3>
-    <p class="text-muted">Всего прохождений: @statistics.TotalResponses</p>
+
+    <p class="text-muted">
+        Всего прохождений: @statistics.TotalResponses
+    </p>
+
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="text-muted">Среднее время</div>
+                    <div class="text-muted">
+                        Среднее время
+                    </div>
+
                     <div class="fw-bold">
                         @(statistics.AverageCompletionTimeSeconds > 0
-                                            ? $"{Math.Round(statistics.AverageCompletionTimeSeconds)} сек."
-                                            : "—")
+                            ? $"{Math.Round(statistics.AverageCompletionTimeSeconds)} сек."
+                            : "—")
                     </div>
                 </div>
             </div>
@@ -63,7 +75,10 @@ else
         <div class="col-md-3">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="text-muted">Первый ответ</div>
+                    <div class="text-muted">
+                        Первый ответ
+                    </div>
+
                     <div class="fw-bold">
                         @(statistics.FirstResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
                     </div>
@@ -74,7 +89,10 @@ else
         <div class="col-md-3">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="text-muted">Последний ответ</div>
+                    <div class="text-muted">
+                        Последний ответ
+                    </div>
+
                     <div class="fw-bold">
                         @(statistics.LastResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
                     </div>
@@ -83,21 +101,94 @@ else
         </div>
     </div>
 
+    <div class="card mb-4 shadow-sm border-0">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    Пользователи, прошедшие опрос
+                </h5>
+
+                <button class="btn btn-outline-secondary btn-sm"
+                        @onclick="ToggleParticipantsPanel">
+                    @(isParticipantsCollapsed ? "Развернуть" : "Свернуть")
+                </button>
+            </div>
+
+            @if (!isParticipantsCollapsed)
+            {
+                @if (participants.Count == 0)
+                {
+                    <p class="text-muted mb-0">
+                        Пока нет пользователей, прошедших этот опрос
+                    </p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Пользователь</th>
+                                    <th>Email</th>
+                                    <th>Дата прохождения</th>
+                                    <th class="text-end">Действие</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var participant in participants)
+                                {
+                                    <tr>
+                                        <td>
+                                            @participant.FullName
+                                        </td>
+
+                                        <td>
+                                            @(participant.Email ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(participant.SubmittedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                                        </td>
+
+                                        <td class="text-end">
+                                            <button class="btn btn-success btn-sm"
+                                                    @onclick="() => OpenUserAnswers(participant.ResponseId)">
+                                                Смотреть ответы
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+
     <hr />
 
     @for (int i = 0; i < statistics.Questions.Count; i++)
     {
         var question = statistics.Questions[i];
+
         <div class="card mb-4 shadow-sm border-0">
             <div class="card-body">
 
-                <h5>@(i + 1). @question.Text</h5>
+                <h5>
+                    @(i + 1). @question.Text
+                </h5>
 
                 @if (question.Type == "Text")
                 {
                     if (question.TextAnswers.Count == 0)
                     {
-                        <p class="text-muted">Нет ответов</p>
+                        <p class="text-muted">
+                            Нет ответов
+                        </p>
                     }
                     else
                     {
@@ -119,10 +210,12 @@ else
                     {
                         <div class="mt-2 text-muted small">
                             Среднее: @question.AverageValue:F2
+
                             @if (question.MinValue.HasValue && question.MaxValue.HasValue)
                             {
                                 <span>
-                                    | Мин: @question.MinValue | Макс: @question.MaxValue
+                                    | Мин: @question.MinValue
+                                    | Макс: @question.MaxValue
                                 </span>
                             }
                         </div>
@@ -142,7 +235,13 @@ else
     public string? From { get; set; }
 
     private SurveyStatisticsDto? statistics;
+
+    private List<SurveyParticipantDto> participants = new();
+
     private bool isLoading = true;
+
+    private bool isParticipantsCollapsed;
+
     private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
@@ -160,7 +259,8 @@ else
             if (question.Type == "Text")
                 continue;
 
-            await JS.InvokeVoidAsync("renderChart",
+            await JS.InvokeVoidAsync(
+                "renderChart",
                 $"chart_{question.Id}",
                 question.Labels,
                 question.Values,
@@ -173,7 +273,11 @@ else
         try
         {
             isLoading = true;
+
             statistics = await StatisticsService.GetSurveyStatisticsAsync(SurveyId);
+
+            participants = await StatisticsService
+                .GetSurveyParticipantsAsync(SurveyId);
         }
         catch (Exception ex)
         {
@@ -183,6 +287,17 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void ToggleParticipantsPanel()
+    {
+        isParticipantsCollapsed = !isParticipantsCollapsed;
+    }
+
+    private void OpenUserAnswers(int responseId)
+    {
+        NavigationManager.NavigateTo(
+            $"/admin/results/{SurveyId}/responses/{responseId}");
     }
 
     private string GetChartType(string type)
@@ -200,7 +315,9 @@ else
 
     private void GoBack()
     {
-        if (string.Equals(From, "system", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(From,
+            "system",
+            StringComparison.OrdinalIgnoreCase))
         {
             NavigationManager.NavigateTo("/admin/statistics");
             return;

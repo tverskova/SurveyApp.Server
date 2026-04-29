@@ -1,0 +1,146 @@
+﻿@page "/admin/results/{SurveyId:int}/responses/{ResponseId:int}"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.Statistics
+@using SurveyApp.Server.Services.Interfaces
+
+@inject IStatisticsService StatisticsService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Ответы пользователя</PageTitle>
+
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Ответы пользователя</h3>
+            <p class="survey-page-subtitle">Просмотр ответов конкретного прохождения опроса</p>
+        </div>
+
+        <div class="survey-header-actions">
+            <button class="btn btn-outline-secondary" @onclick="GoBack">
+                ← Назад к статистике
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка ответов...</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+        </div>
+    }
+    else if (answers is null)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Ответы не найдены.</p>
+        </section>
+    }
+    else
+    {
+        <section class="survey-section-card">
+            <h4>@answers.SurveyTitle</h4>
+
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <strong>Пользователь:</strong>
+                    <div>@answers.UserFullName</div>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Email:</strong>
+                    <div>@(answers.UserEmail ?? "—")</div>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Дата прохождения:</strong>
+                    <div>@(answers.SubmittedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="survey-section-card mt-4">
+            <h4>Ответы</h4>
+
+            @if (answers.Answers.Count == 0)
+            {
+                <p class="text-muted mb-0">У пользователя нет сохранённых ответов.</p>
+            }
+            else
+            {
+                @for (int i = 0; i < answers.Answers.Count; i++)
+                {
+                    var answer = answers.Answers[i];
+
+                    <div class="user-answer-card mt-3">
+                        <div class="mb-2">
+                            <strong>@(i + 1). @answer.QuestionText</strong>
+                        </div>
+
+                        <div class="text-muted mb-2">
+                            Тип вопроса: @answer.QuestionType
+                        </div>
+
+                        <div class="answer-value">
+                            <strong>Ответ:</strong> @answer.AnswerText
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int SurveyId { get; set; }
+
+    [Parameter]
+    public int ResponseId { get; set; }
+
+    private UserSurveyAnswersDto? answers;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAnswers();
+    }
+
+    private async Task LoadAnswers()
+    {
+        try
+        {
+            isLoading = true;
+
+            answers = await StatisticsService.GetUserSurveyAnswersAsync(ResponseId);
+
+            if (answers is not null && answers.SurveyId != SurveyId)
+            {
+                answers = null;
+                errorMessage = "Ответы не относятся к выбранному опросу.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo($"/admin/results/{SurveyId}");
+    }
+}

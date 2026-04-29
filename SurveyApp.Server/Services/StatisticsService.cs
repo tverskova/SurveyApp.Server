@@ -612,5 +612,126 @@ namespace SurveyApp.Server.Services
             return text.Length <= maxLength ? text : text[..maxLength] + "...";
         }
 
+        public async Task<List<SurveyParticipantDto>> GetSurveyParticipantsAsync(int surveyId)
+        {
+            var responses = await _context.SurveyResponses
+                .AsNoTracking()
+                .Include(r => r.User)
+                    .ThenInclude(u => u!.UserProfile)
+                .Where(r => r.SurveyId == surveyId && r.SubmittedAt.HasValue)
+                .OrderByDescending(r => r.SubmittedAt)
+                .ToListAsync();
+
+            return responses.Select(r =>
+            {
+                var profile = r.User?.UserProfile;
+
+                var fullName = string.Join(" ", new[]
+                {
+            profile?.LastName,
+            profile?.FirstName
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+                if (string.IsNullOrWhiteSpace(fullName))
+                {
+                    fullName = r.User?.UserName ?? "Анонимный пользователь";
+                }
+
+                return new SurveyParticipantDto
+                {
+                    ResponseId = r.Id,
+                    UserId = r.UserId ?? string.Empty,
+                    FullName = fullName,
+                    Email = r.User?.Email,
+                    StartedAt = r.StartedAt,
+                    SubmittedAt = r.SubmittedAt
+                };
+            }).ToList();
+        }
+
+        public async Task<UserSurveyAnswersDto?> GetUserSurveyAnswersAsync(int responseId)
+        {
+            var response = await _context.SurveyResponses
+                .AsNoTracking()
+                .Include(r => r.Survey)
+                .Include(r => r.User)
+                    .ThenInclude(u => u!.UserProfile)
+                .Include(r => r.Answers)
+                    .ThenInclude(a => a.Question)
+                .Include(r => r.Answers)
+                    .ThenInclude(a => a.AnswerOptions)
+                        .ThenInclude(ao => ao.QuestionOption)
+                .FirstOrDefaultAsync(r => r.Id == responseId);
+
+            if (response is null)
+                return null;
+
+            var profile = response.User?.UserProfile;
+
+            var fullName = string.Join(" ", new[]
+            {
+        profile?.LastName,
+        profile?.FirstName
+    }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                fullName = response.User?.UserName ?? "Анонимный пользователь";
+            }
+
+            return new UserSurveyAnswersDto
+            {
+                ResponseId = response.Id,
+                SurveyId = response.SurveyId,
+                SurveyTitle = response.Survey.Title,
+                UserFullName = fullName,
+                UserEmail = response.User?.Email,
+                StartedAt = response.StartedAt,
+                SubmittedAt = response.SubmittedAt,
+                Answers = response.Answers
+                    .OrderBy(a => a.Question.Order)
+                    .Select(a => new UserAnswerDto
+                    {
+                        QuestionId = a.QuestionId,
+                        QuestionText = a.Question.Text,
+                        QuestionType = a.Question.QuestionType,
+                        QuestionOrder = a.Question.Order,
+                        AnswerText = FormatAnswer(a)
+                    })
+                    .ToList()
+            };
+        }
+
+        private static string FormatAnswer(Answer answer)
+        {
+            return answer.Question.QuestionType switch
+            {
+                "Text" => string.IsNullOrWhiteSpace(answer.TextAnswer)
+                    ? "—"
+                    : answer.TextAnswer,
+
+                "Number" => answer.NumberAnswer.HasValue
+                    ? answer.NumberAnswer.Value.ToString("G", CultureInfo.CurrentCulture)
+                    : "—",
+
+                "Rating" => answer.RatingAnswer.HasValue
+                    ? answer.RatingAnswer.Value.ToString()
+                    : "—",
+
+                "YesNo" => answer.YesNoAnswer.HasValue
+                    ? answer.YesNoAnswer.Value ? "Да" : "Нет"
+                    : "—",
+
+                "SingleChoice" or "MultipleChoice" => answer.AnswerOptions.Any()
+                    ? string.Join(", ", answer.AnswerOptions
+                        .OrderBy(ao => ao.QuestionOption.Order)
+                        .Select(ao => ao.QuestionOption.Text))
+                    : "—",
+
+                _ => "—"
+            };
+        }
+
     }
+
 }
