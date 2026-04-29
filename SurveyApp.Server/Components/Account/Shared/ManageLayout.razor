@@ -1,11 +1,14 @@
 ﻿@inherits LayoutComponentBase
 @layout SurveyApp.Server.Components.Layout.MainLayout
 
-<h1>Manage your account</h1>
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            @* <h1 class="survey-page-title">Личный кабинет</h1> *@
+            <p class="survey-page-subtitle">Настройки аккаунта и управление личными данными</p>
+        </div>
+    </div>
 
-<div>
-    <h2>Change your account settings</h2>
-    <hr />
     <div class="row">
         <div class="col-lg-3">
             <ManageNavMenu />
