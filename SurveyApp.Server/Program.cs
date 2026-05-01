@@ -146,9 +146,13 @@ static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
 
     var database = uri.AbsolutePath.TrimStart('/');
 
+    var port = uri.Port > 0
+        ? uri.Port
+        : 5432;
+
     return
         $"Host={uri.Host};" +
-        $"Port={uri.Port};" +
+        $"Port={port};" +
         $"Database={database};" +
         $"Username={username};" +
         $"Password={password};" +
