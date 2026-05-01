@@ -32,7 +32,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddIdentityCookies();
 
-var databaseUrl = builder.Configuration["DATABASE_URL = postgresql://survey_db_dxb1_user:clVNDc3MjS6g9MqU9GXagYHavhM1HuUJ@dpg-d7q9pvvavr4c73fmjs30-a/survey_db_dxb1"];
+var databaseUrl = builder.Configuration["DATABASE_URL"];
 
 if (!string.IsNullOrWhiteSpace(databaseUrl))
 {
