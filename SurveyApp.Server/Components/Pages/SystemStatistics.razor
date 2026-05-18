@@ -14,7 +14,7 @@
     <div class="survey-page-header">
         <div>
             <h3 class="survey-page-title">Статистика системы</h3>
-            <p class="survey-page-subtitle">Общая статистика пользователей, опросов и прохождений</p>
+            <p class="survey-page-subtitle">Общая статистика опросов и прохождений</p>
         </div>
     </div>
 
@@ -36,11 +36,6 @@
     {
         <section class="statistics-summary-grid">
             <div class="statistics-summary-card">
-                <div class="statistics-summary-label">Пользователи</div>
-                <div class="statistics-summary-value">@statistics.TotalUsers</div>
-            </div>
-
-            <div class="statistics-summary-card">
                 <div class="statistics-summary-label">Всего опросов</div>
                 <div class="statistics-summary-value">@statistics.TotalSurveys</div>
             </div>
@@ -48,6 +43,16 @@
             <div class="statistics-summary-card">
                 <div class="statistics-summary-label">Опубликованные</div>
                 <div class="statistics-summary-value">@statistics.PublishedSurveys</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Черновики</div>
+                <div class="statistics-summary-value">@statistics.DraftSurveys</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Активные</div>
+                <div class="statistics-summary-value">@statistics.ActiveSurveys</div>
             </div>
 
             <div class="statistics-summary-card">

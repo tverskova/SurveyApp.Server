@@ -1,0 +1,353 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SurveyApp.Server.DTOs.Users
+@using SurveyApp.Server.Services.Interfaces
+@inject IUserManagementService UserManagementService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Пользователи</PageTitle>
+
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Пользователи</h3>
+            <p class="survey-page-subtitle">Управление ролями и просмотр активности пользователей</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка пользователей...</p>
+        </section>
+    }
+    else if (summary is null)
+    {
+        <div class="alert alert-warning">Данные пользователей недоступны.</div>
+    }
+    else
+    {
+        <section class="statistics-summary-grid users-summary-grid">
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Всего пользователей</div>
+                <div class="statistics-summary-value">@summary.TotalUsers</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Администраторы</div>
+                <div class="statistics-summary-value">@summary.AdminUsers</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Обычные пользователи</div>
+                <div class="statistics-summary-value">@summary.RegularUsers</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Проходили опросы</div>
+                <div class="statistics-summary-value">@summary.UsersWithCompletedSurveys</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Всего прохождений</div>
+                <div class="statistics-summary-value">@summary.TotalSurveyCompletions</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Среднее на пользователя</div>
+                <div class="statistics-summary-value">@summary.AverageCompletedSurveysPerUser.ToString("0.##")</div>
+            </div>
+        </section>
+
+        <section class="survey-section-card">
+            <div class="survey-section-header survey-section-header-between statistics-table-header users-table-header">
+                <div>
+                    <h4 class="survey-section-title">Список пользователей</h4>
+                    <p class="survey-section-subtitle">Поиск, фильтрация, сортировка и управление ролями</p>
+                </div>
+            </div>
+
+            <div class="users-filters-grid mb-3">
+                <div class="search-input-wrap">
+                    <input class="form-control search-input-with-clear"
+                           placeholder="Поиск по email, имени, фамилии или городу..."
+                           @bind="searchText" />
+
+                    @if (!string.IsNullOrWhiteSpace(searchText))
+                    {
+                        <button type="button"
+                                class="search-clear-btn"
+                                title="Очистить поиск"
+                                @onclick="ClearSearch">
+                            ✕
+                        </button>
+                    }
+                </div>
+
+                <select class="form-select" @bind="roleFilter">
+                    <option value="All">Все роли</option>
+                    <option value="Admin">Admin</option>
+                    <option value="User">User</option>
+                </select>
+
+                <select class="form-select" @bind="sortBy">
+                    <option value="Email">Сортировка: email</option>
+                    <option value="CompletedSurveys">Сортировка: прохождения</option>
+                    <option value="LastSubmittedAt">Сортировка: последнее прохождение</option>
+                </select>
+
+                <select class="form-select" @bind="sortDirection">
+                    <option value="Asc">По возрастанию</option>
+                    <option value="Desc">По убыванию</option>
+                </select>
+            </div>
+
+            @if (FilteredUsers.Count == 0)
+            {
+                <div class="survey-empty-state">
+                    <div class="survey-empty-title">Пользователи не найдены</div>
+                    <div class="survey-empty-text">Попробуйте изменить поиск, фильтр роли или сортировку.</div>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive users-table-wrap">
+                    <table class="table admin-table align-middle users-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Имя</th>
+                                <th>Фамилия</th>
+                                <th>Город</th>
+                                <th>Дата рождения</th>
+                                <th>Роли</th>
+                                <th>Пройдено опросов</th>
+                                <th>Ответов</th>
+                                <th>Последнее прохождение</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in FilteredUsers)
+                            {
+                                <tr>
+                                    <td>@Display(user.Email)</td>
+                                    <td>@Display(user.FirstName)</td>
+                                    <td>@Display(user.LastName)</td>
+                                    <td>@Display(user.City)</td>
+                                    <td>@FormatDate(user.BirthDate)</td>
+                                    <td>
+                                        <div class="users-role-list">
+                                            @if (user.Roles.Count == 0)
+                                            {
+                                                <span class="users-role-badge users-role-empty">Нет ролей</span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var role in user.Roles)
+                                                {
+                                                    <span class="users-role-badge">@role</span>
+                                                }
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>@user.CompletedSurveysCount</td>
+                                    <td>@user.AnswersCount</td>
+                                    <td>@FormatDateTime(user.LastSubmittedAt)</td>
+                                    <td>
+                                        <div class="users-actions-cell">
+                                            <button type="button"
+                                                    class="btn btn-info btn-sm"
+                                                    disabled="@user.Roles.Contains("Admin")"
+                                                    @onclick='@(() => SetRole(user.UserId, "Admin", true))'>
+                                                Назначить Admin
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-warning btn-sm"
+                                                    disabled="@(!user.Roles.Contains("Admin"))"
+                                                    @onclick='@(() => SetRole(user.UserId, "Admin", false))'>
+                                                Снять Admin
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-info btn-sm"
+                                                    disabled="@user.Roles.Contains("User")"
+                                                    @onclick='@(() => SetRole(user.UserId, "User", true))'>
+                                                Назначить User
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-warning btn-sm"
+                                                    disabled="@(!user.Roles.Contains("User"))"
+                                                    @onclick='@(() => SetRole(user.UserId, "User", false))'>
+                                                Снять User
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-success btn-sm"
+                                                    @onclick='@(() => OpenDetails(user.UserId))'>
+                                                Статистика
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private UserStatisticsSummaryDto? summary;
+    private List<UserListItemDto> users = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? currentAdminUserId;
+
+    private string searchText = string.Empty;
+    private string roleFilter = "All";
+    private string sortBy = "Email";
+    private string sortDirection = "Asc";
+
+    private List<UserListItemDto> FilteredUsers
+    {
+        get
+        {
+            IEnumerable<UserListItemDto> query = users;
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                query = query.Where(u =>
+                    Contains(u.Email, searchText) ||
+                    Contains(u.FirstName, searchText) ||
+                    Contains(u.LastName, searchText) ||
+                    Contains(u.City, searchText));
+            }
+
+            if (roleFilter != "All")
+            {
+                query = query.Where(u => u.Roles.Contains(roleFilter));
+            }
+
+            query = sortBy switch
+            {
+                "CompletedSurveys" => sortDirection == "Asc"
+                    ? query.OrderBy(u => u.CompletedSurveysCount).ThenBy(u => u.Email)
+                    : query.OrderByDescending(u => u.CompletedSurveysCount).ThenBy(u => u.Email),
+                "LastSubmittedAt" => sortDirection == "Asc"
+                    ? query.OrderBy(u => u.LastSubmittedAt ?? DateTime.MaxValue).ThenBy(u => u.Email)
+                    : query.OrderByDescending(u => u.LastSubmittedAt ?? DateTime.MinValue).ThenBy(u => u.Email),
+                _ => sortDirection == "Asc"
+                    ? query.OrderBy(u => u.Email)
+                    : query.OrderByDescending(u => u.Email)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentAdminUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            summary = await UserManagementService.GetSummaryAsync();
+            users = await UserManagementService.GetUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке пользователей: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SetRole(string userId, string roleName, bool assign)
+    {
+        try
+        {
+            successMessage = null;
+            errorMessage = null;
+
+            var result = await UserManagementService.SetUserRoleAsync(
+                userId,
+                roleName,
+                assign,
+                currentAdminUserId);
+
+            if (!result.Succeeded)
+            {
+                errorMessage = result.Message;
+                return;
+            }
+
+            successMessage = result.Message;
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при изменении роли: {ex.Message}";
+        }
+    }
+
+    private void OpenDetails(string userId)
+    {
+        NavigationManager.NavigateTo($"/admin/users/{Uri.EscapeDataString(userId)}");
+    }
+
+    private void ClearSearch()
+    {
+        searchText = string.Empty;
+    }
+
+    private static bool Contains(string? value, string search)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Contains(search, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Не указано" : value;
+    }
+
+    private static string FormatDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "Не указано";
+    }
+
+    private static string FormatDateTime(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-";
+    }
+}

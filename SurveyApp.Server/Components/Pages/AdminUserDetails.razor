@@ -1,0 +1,206 @@
+@page "/admin/users/{UserId}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SurveyApp.Server.DTOs.Users
+@using SurveyApp.Server.Services.Interfaces
+@inject IUserManagementService UserManagementService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Статистика пользователя</PageTitle>
+
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Статистика пользователя</h3>
+            <p class="survey-page-subtitle">Подробная история прохождений и ответов</p>
+        </div>
+
+        <div class="survey-header-actions">
+            <button class="btn btn-outline-secondary" @onclick="GoBack">
+                ← Назад к пользователям
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка статистики пользователя...</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (user is null)
+    {
+        <div class="alert alert-warning">Пользователь не найден.</div>
+    }
+    else
+    {
+        <section class="survey-section-card">
+            <h4>@Display(user.Email)</h4>
+
+            <div class="row mt-3">
+                <div class="col-md-3 mb-3">
+                    <strong>Имя:</strong>
+                    <div>@Display(user.FirstName)</div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <strong>Фамилия:</strong>
+                    <div>@Display(user.LastName)</div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <strong>Город:</strong>
+                    <div>@Display(user.City)</div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <strong>Дата рождения:</strong>
+                    <div>@FormatDate(user.BirthDate)</div>
+                </div>
+            </div>
+
+            <div class="users-role-list">
+                @if (user.Roles.Count == 0)
+                {
+                    <span class="users-role-badge users-role-empty">Нет ролей</span>
+                }
+                else
+                {
+                    @foreach (var role in user.Roles)
+                    {
+                        <span class="users-role-badge">@role</span>
+                    }
+                }
+            </div>
+        </section>
+
+        <section class="survey-section-card">
+            <div class="survey-section-header">
+                <h4 class="survey-section-title">Пройденные опросы</h4>
+                <p class="survey-section-subtitle">Всего прохождений: @user.SurveyResults.Count</p>
+            </div>
+
+            @if (user.SurveyResults.Count == 0)
+            {
+                <div class="survey-empty-state">
+                    <div class="survey-empty-title">Пользователь ещё не проходил опросы</div>
+                    <div class="survey-empty-text">Когда пользователь отправит ответы, они появятся здесь.</div>
+                </div>
+            }
+            else
+            {
+                @foreach (var result in user.SurveyResults)
+                {
+                    <div class="survey-question-card">
+                        <div class="survey-question-header">
+                            <div>
+                                <div class="survey-question-index">@result.SurveyTitle</div>
+                                <div class="survey-question-caption">
+                                    Дата прохождения: @FormatDateTime(result.SubmittedAt) · Ответов: @result.AnswersCount
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (result.Answers.Count == 0)
+                        {
+                            <p class="text-muted mb-0">В этом прохождении нет сохранённых ответов.</p>
+                        }
+                        else
+                        {
+                            @for (int i = 0; i < result.Answers.Count; i++)
+                            {
+                                var answer = result.Answers[i];
+
+                                <div class="user-answer-card mt-3">
+                                    <div class="mb-2">
+                                        <strong>@(i + 1). @answer.QuestionText</strong>
+                                    </div>
+
+                                    <div class="text-muted mb-2">
+                                        Тип вопроса: @GetQuestionTypeLabel(answer.QuestionType)
+                                    </div>
+
+                                    <div class="answer-value">
+                                        <strong>Ответ:</strong> @answer.AnswerText
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            }
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = string.Empty;
+
+    private UserDetailsDto? user;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            user = await UserManagementService.GetUserDetailsAsync(UserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке статистики пользователя: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/admin/users");
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Не указано" : value;
+    }
+
+    private static string FormatDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "Не указано";
+    }
+
+    private static string FormatDateTime(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-";
+    }
+
+    private static string GetQuestionTypeLabel(string questionType)
+    {
+        return questionType switch
+        {
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
+            _ => questionType
+        };
+    }
+}
