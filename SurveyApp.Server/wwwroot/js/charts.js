@@ -5,6 +5,16 @@
     if (!ctx)
         return;
 
+    if (!window.Chart) {
+        console.error("Chart.js не загружен.");
+        return;
+    }
+
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
     new Chart(ctx, {
         type: chartType,
         data: {

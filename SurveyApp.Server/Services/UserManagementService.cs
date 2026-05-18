@@ -187,9 +187,6 @@ namespace SurveyApp.Server.Services
 
             if (roleName == "Admin")
             {
-                if (!string.IsNullOrWhiteSpace(currentAdminUserId) && currentAdminUserId == userId)
-                    return Error("Вы не можете снять роль Admin у своей учётной записи. Обратитесь к другому администратору.");
-
                 var adminCount = await CountUsersInRoleAsync("Admin");
                 if (adminCount <= 1)
                     return Error("Нельзя снять роль Admin у последнего администратора.");

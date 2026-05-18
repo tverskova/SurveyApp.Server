@@ -1,8 +1,3 @@
-﻿@using Microsoft.AspNetCore.Identity
-@using SurveyApp.Server.Data
-
-@inject SignInManager<ApplicationUser> SignInManager
-
 <ul class="nav nav-pills flex-column">
     <li class="nav-item">
         <NavLink class="nav-link" href="Account/Manage" Match="NavLinkMatch.All">Профиль</NavLink>
@@ -13,28 +8,4 @@
     <li class="nav-item">
         <NavLink class="nav-link" href="Account/Manage/ChangePassword">Пароль</NavLink>
     </li>
-    @if (hasExternalLogins)
-    {
-        <li class="nav-item">
-            <NavLink class="nav-link" href="Account/Manage/ExternalLogins">Внешние входы</NavLink>
-        </li>
-    }
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/TwoFactorAuthentication">Двухфакторная аутентификация</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/Passkeys">Ключи доступа</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/PersonalData">Персональные данные</NavLink>
-    </li>
 </ul>
-
-@code {
-    private bool hasExternalLogins;
-
-    protected override async Task OnInitializedAsync()
-    {
-        hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
-    }
-}

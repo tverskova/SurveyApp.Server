@@ -119,7 +119,7 @@ public class UserManagementServiceTests
     }
 
     [Fact]
-    public async Task SetUserRoleAsync_RemoveOwnAdminRole_ShouldReturnError()
+    public async Task SetUserRoleAsync_RemoveOwnAdminRole_WhenAnotherAdminExists_ShouldRemoveRole()
     {
         // Arrange
         await using var provider = TestDbContextFactory.CreateServiceProvider();
@@ -133,8 +133,8 @@ public class UserManagementServiceTests
         var result = await service.SetUserRoleAsync(admin.Id, "Admin", false, admin.Id);
 
         // Assert
-        result.Succeeded.Should().BeFalse();
-        result.Message.Should().Contain("своей учётной записи");
+        result.Succeeded.Should().BeTrue();
+        (await userManager.IsInRoleAsync(admin, "Admin")).Should().BeFalse();
     }
 
     [Fact]

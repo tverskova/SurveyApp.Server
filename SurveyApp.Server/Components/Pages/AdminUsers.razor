@@ -2,11 +2,13 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
 @using SurveyApp.Server.DTOs.Users
 @using SurveyApp.Server.Services.Interfaces
 @inject IUserManagementService UserManagementService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -54,21 +56,6 @@
             </div>
 
             <div class="statistics-summary-card">
-                <div class="statistics-summary-label">Обычные пользователи</div>
-                <div class="statistics-summary-value">@summary.RegularUsers</div>
-            </div>
-
-            <div class="statistics-summary-card">
-                <div class="statistics-summary-label">Проходили опросы</div>
-                <div class="statistics-summary-value">@summary.UsersWithCompletedSurveys</div>
-            </div>
-
-            <div class="statistics-summary-card">
-                <div class="statistics-summary-label">Всего прохождений</div>
-                <div class="statistics-summary-value">@summary.TotalSurveyCompletions</div>
-            </div>
-
-            <div class="statistics-summary-card">
                 <div class="statistics-summary-label">Среднее на пользователя</div>
                 <div class="statistics-summary-value">@summary.AverageCompletedSurveysPerUser.ToString("0.##")</div>
             </div>
@@ -103,8 +90,8 @@
                     <label class="form-label">Роль</label>
                     <select class="form-select" @bind="roleFilter">
                         <option value="All">Все роли</option>
-                        <option value="Admin">Admin</option>
-                        <option value="User">User</option>
+                        <option value="Admin">Администратор</option>
+                        <option value="User">Пользователь</option>
                     </select>
                 </div>
 
@@ -136,19 +123,17 @@
             else
             {
                 <div class="table-responsive users-table-wrap">
-                    <table class="table admin-table align-middle users-table">
+                    <table id="users-table" class="table admin-table align-middle users-table">
                         <thead>
                             <tr>
-                                <th>Email</th>
-                                <th>Имя</th>
-                                <th>Фамилия</th>
-                                <th>Город</th>
-                                <th>Дата рождения</th>
-                                <th>Роли</th>
-                                <th>Пройдено</th>
-                                <th>Ответов</th>
-                                <th>Последнее прохождение</th>
-                                <th>Действия</th>
+                                <th>Email <span class="users-column-resizer"></span></th>
+                                <th>Имя <span class="users-column-resizer"></span></th>
+                                <th>Фамилия <span class="users-column-resizer"></span></th>
+                                <th>Город <span class="users-column-resizer"></span></th>
+                                <th>Дата рождения <span class="users-column-resizer"></span></th>
+                                <th>Роли <span class="users-column-resizer"></span></th>
+                                <th>Последнее прохождение <span class="users-column-resizer"></span></th>
+                                <th>Действия <span class="users-column-resizer"></span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -170,13 +155,16 @@
                                             {
                                                 @foreach (var role in user.Roles)
                                                 {
-                                                    <span class="users-role-badge">@role</span>
+                                                    <button type="button"
+                                                            class="@GetRoleBadgeClass(role)"
+                                                            title="@GetRoleActionTitle(role)"
+                                                            @onclick="@(() => OpenRoleChangeModal(user, role))">
+                                                        @GetRoleDisplayName(role)
+                                                    </button>
                                                 }
                                             }
                                         </div>
                                     </td>
-                                    <td>@user.CompletedSurveysCount</td>
-                                    <td>@user.AnswersCount</td>
                                     <td>@FormatDateTime(user.LastSubmittedAt)</td>
                                     <td>
                                         <div class="users-actions-cell">
@@ -185,25 +173,6 @@
                                                     @onclick='@(() => OpenDetails(user.UserId))'>
                                                 Статистика
                                             </button>
-
-                                            <select class="form-select form-select-sm users-role-action-select"
-                                                    value=""
-                                                    @onchange="e => ApplyRoleAction(user, e.Value?.ToString())">
-                                                <option value="">Действие с ролью</option>
-                                                @if (user.Roles.Contains("Admin"))
-                                                {
-                                                    <option value="make-user">Назначить пользователем</option>
-                                                }
-                                                else if (user.Roles.Contains("User"))
-                                                {
-                                                    <option value="make-admin">Назначить администратором</option>
-                                                }
-                                                else
-                                                {
-                                                    <option value="make-user">Назначить пользователем</option>
-                                                    <option value="make-admin">Назначить администратором</option>
-                                                }
-                                            </select>
                                         </div>
                                     </td>
                                 </tr>
@@ -215,6 +184,41 @@
         </section>
     }
 </div>
+
+@if (pendingRoleUser is not null && pendingRole is not null && pendingNewRole is not null)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md">
+            <div class="survey-modal-header">
+                <h5 class="mb-0">Изменение роли пользователя</h5>
+                <button type="button" class="btn-close" @onclick="CloseRoleChangeModal"></button>
+            </div>
+
+            <div class="survey-modal-body">
+                <p class="mb-0">
+                    Вы действительно хотите изменить роль пользователя @Display(pendingRoleUser.Email)
+                    на "@GetRoleDisplayName(pendingNewRole)"?
+                </p>
+            </div>
+
+            <div class="survey-modal-footer">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        disabled="@isRoleChanging"
+                        @onclick="CloseRoleChangeModal">
+                    Отмена
+                </button>
+
+                <button type="button"
+                        class="btn btn-primary"
+                        disabled="@isRoleChanging"
+                        @onclick="ConfirmRoleChange">
+                    Изменить роль
+                </button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     private UserStatisticsSummaryDto? summary;
@@ -228,6 +232,10 @@
     private string roleFilter = "All";
     private string sortBy = "Email";
     private string sortDirection = "Asc";
+    private UserListItemDto? pendingRoleUser;
+    private string? pendingRole;
+    private string? pendingNewRole;
+    private bool isRoleChanging;
 
     private List<UserListItemDto> FilteredUsers
     {
@@ -273,6 +281,12 @@
         await LoadUsers();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading)
+            await JS.InvokeVoidAsync("surveyUsersTable.initResizable", "users-table");
+    }
+
     private async Task LoadUsers()
     {
         try
@@ -292,54 +306,79 @@
         }
     }
 
-    private async Task ApplyRoleAction(UserListItemDto user, string? action)
+    private void OpenRoleChangeModal(UserListItemDto user, string role)
     {
-        if (string.IsNullOrWhiteSpace(action))
+        var newRole = GetOppositeRole(role);
+        if (newRole is null)
             return;
 
-        if (action == "make-admin")
-        {
-            await AssignAsAdmin(user.UserId);
+        pendingRoleUser = user;
+        pendingRole = role;
+        pendingNewRole = newRole;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CloseRoleChangeModal()
+    {
+        if (isRoleChanging)
             return;
+
+        pendingRoleUser = null;
+        pendingRole = null;
+        pendingNewRole = null;
+    }
+
+    private async Task ConfirmRoleChange()
+    {
+        if (pendingRoleUser is null || pendingRole is null || pendingNewRole is null)
+            return;
+
+        isRoleChanging = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            var result = pendingNewRole == "Admin"
+                ? await ChangeToAdmin(pendingRoleUser.UserId)
+                : await ChangeToUser(pendingRoleUser.UserId);
+
+            if (!result)
+                return;
+
+            CloseRoleChangeModalCore();
+            successMessage = "Роль успешно изменена.";
+            await LoadUsers();
         }
-
-        if (action == "make-user")
+        finally
         {
-            await AssignAsUser(user.UserId);
+            isRoleChanging = false;
         }
     }
 
-    private async Task AssignAsAdmin(string userId)
+    private async Task<bool> ChangeToAdmin(string userId)
     {
-        var addAdminResult = await SetRole(userId, "Admin", true, reload: false);
+        var addAdminResult = await SetRole(userId, "Admin", true, reload: false, showSuccess: false);
         if (!addAdminResult)
-        {
-            await LoadUsers();
-            return;
-        }
+            return false;
 
-        await SetRole(userId, "User", false, reload: true);
+        return await SetRole(userId, "User", false, reload: false, showSuccess: false);
     }
 
-    private async Task AssignAsUser(string userId)
+    private async Task<bool> ChangeToUser(string userId)
     {
-        var removeAdminResult = await SetRole(userId, "Admin", false, reload: false);
+        var removeAdminResult = await SetRole(userId, "Admin", false, reload: false, showSuccess: false);
         if (!removeAdminResult)
-        {
-            await LoadUsers();
-            return;
-        }
+            return false;
 
-        await SetRole(userId, "User", true, reload: true);
+        return await SetRole(userId, "User", true, reload: false, showSuccess: false);
     }
 
-    private async Task<bool> SetRole(string userId, string roleName, bool assign, bool reload)
+    private async Task<bool> SetRole(string userId, string roleName, bool assign, bool reload, bool showSuccess)
     {
         try
         {
-            successMessage = null;
-            errorMessage = null;
-
             var result = await UserManagementService.SetUserRoleAsync(
                 userId,
                 roleName,
@@ -348,11 +387,12 @@
 
             if (!result.Succeeded)
             {
-                errorMessage = result.Message;
+                errorMessage = NormalizeRoleError(result.Message);
                 return false;
             }
 
-            successMessage = result.Message;
+            if (showSuccess)
+                successMessage = result.Message;
 
             if (reload)
                 await LoadUsers();
@@ -371,6 +411,13 @@
         NavigationManager.NavigateTo($"/admin/users/{Uri.EscapeDataString(userId)}");
     }
 
+    private void CloseRoleChangeModalCore()
+    {
+        pendingRoleUser = null;
+        pendingRole = null;
+        pendingNewRole = null;
+    }
+
     private void ClearSearch()
     {
         searchText = string.Empty;
@@ -385,6 +432,53 @@
     private static string Display(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "Не указано" : value;
+    }
+
+    private static string GetRoleDisplayName(string role)
+    {
+        return role switch
+        {
+            "Admin" => "Администратор",
+            "User" => "Пользователь",
+            _ => role
+        };
+    }
+
+    private static string? GetOppositeRole(string role)
+    {
+        return role switch
+        {
+            "Admin" => "User",
+            "User" => "Admin",
+            _ => null
+        };
+    }
+
+    private static string GetRoleBadgeClass(string role)
+    {
+        return role switch
+        {
+            "Admin" => "users-role-badge users-role-badge-button users-role-admin",
+            "User" => "users-role-badge users-role-badge-button users-role-user",
+            _ => "users-role-badge users-role-badge-button users-role-empty"
+        };
+    }
+
+    private static string GetRoleActionTitle(string role)
+    {
+        return role switch
+        {
+            "Admin" => "Изменить роль на пользователя",
+            "User" => "Изменить роль на администратора",
+            _ => "Изменить роль"
+        };
+    }
+
+    private static string NormalizeRoleError(string message)
+    {
+        return message == "Нельзя снять роль Admin у последнего администратора."
+            ? "Нельзя изменить роль последнего администратора."
+            : message;
     }
 
     private static string FormatDate(DateTime? date)
