@@ -2,5 +2,6 @@
   <Folder Name="/Элементы решения/">
     <File Path="Dockerfile" />
   </Folder>
+  <Project Path="SurveyApp.Server.Tests/SurveyApp.Server.Tests.csproj" />
   <Project Path="SurveyApp.Server/SurveyApp.Server.csproj" />
 </Solution>
