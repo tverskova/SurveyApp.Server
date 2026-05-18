@@ -25,7 +25,6 @@ builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
 
 builder.Services.AddControllers();
 
-
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = IdentityConstants.ApplicationScheme;
@@ -33,11 +32,21 @@ builder.Services.AddAuthentication(options =>
 })
 .AddIdentityCookies();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var databaseUrl = builder.Configuration["DATABASE_URL"];
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+if (!string.IsNullOrWhiteSpace(databaseUrl))
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(ConvertDatabaseUrlToConnectionString(databaseUrl)));
+}
+else
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -77,6 +86,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
 app.MapControllers();
 app.MapAdditionalIdentityEndpoints();
 
@@ -121,5 +131,31 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-
 app.Run();
+
+static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
+{
+    var uri = new Uri(databaseUrl);
+
+    var userInfo = uri.UserInfo.Split(':', 2);
+
+    var username = Uri.UnescapeDataString(userInfo[0]);
+    var password = userInfo.Length > 1
+        ? Uri.UnescapeDataString(userInfo[1])
+        : string.Empty;
+
+    var database = uri.AbsolutePath.TrimStart('/');
+
+    var port = uri.Port > 0
+        ? uri.Port
+        : 5432;
+
+    return
+        $"Host={uri.Host};" +
+        $"Port={port};" +
+        $"Database={database};" +
+        $"Username={username};" +
+        $"Password={password};" +
+        $"SSL Mode=Require;" +
+        $"Trust Server Certificate=true";
+}
