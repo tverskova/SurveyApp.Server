@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,10 +16,10 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetRoles",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    NormalizedName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "TEXT", nullable: true)
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NormalizedName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -29,21 +30,21 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUsers",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", nullable: false),
-                    UserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    NormalizedUserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    Email = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    NormalizedEmail = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "INTEGER", nullable: false),
-                    PasswordHash = table.Column<string>(type: "TEXT", nullable: true),
-                    SecurityStamp = table.Column<string>(type: "TEXT", nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "TEXT", nullable: true),
-                    PhoneNumber = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "INTEGER", nullable: false),
-                    TwoFactorEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    LockoutEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
-                    AccessFailedCount = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NormalizedEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    PasswordHash = table.Column<string>(type: "text", nullable: true),
+                    SecurityStamp = table.Column<string>(type: "text", nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true),
+                    PhoneNumber = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    TwoFactorEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    LockoutEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LockoutEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    AccessFailedCount = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -51,14 +52,35 @@ namespace SurveyApp.Server.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "QuestionBankItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    QuestionType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    IsRequired = table.Column<bool>(type: "boolean", nullable: false),
+                    HasCorrectAnswer = table.Column<bool>(type: "boolean", nullable: false),
+                    RatingMin = table.Column<int>(type: "integer", nullable: true),
+                    RatingMax = table.Column<int>(type: "integer", nullable: true),
+                    Image = table.Column<byte[]>(type: "bytea", nullable: true),
+                    Category = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_QuestionBankItems", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "AspNetRoleClaims",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    RoleId = table.Column<string>(type: "TEXT", nullable: false),
-                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
-                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    RoleId = table.Column<string>(type: "text", nullable: false),
+                    ClaimType = table.Column<string>(type: "text", nullable: true),
+                    ClaimValue = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -75,11 +97,11 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserClaims",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
-                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    ClaimType = table.Column<string>(type: "text", nullable: true),
+                    ClaimValue = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -96,10 +118,10 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserLogins",
                 columns: table => new
                 {
-                    LoginProvider = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    ProviderKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    ProviderDisplayName = table.Column<string>(type: "TEXT", nullable: true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false)
+                    LoginProvider = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ProviderKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ProviderDisplayName = table.Column<string>(type: "text", nullable: true),
+                    UserId = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -116,9 +138,9 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserPasskeys",
                 columns: table => new
                 {
-                    CredentialId = table.Column<byte[]>(type: "BLOB", maxLength: 1024, nullable: false),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    Data = table.Column<string>(type: "TEXT", nullable: false)
+                    CredentialId = table.Column<byte[]>(type: "bytea", maxLength: 1024, nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    Data = table.Column<string>(type: "jsonb", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -135,8 +157,8 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserRoles",
                 columns: table => new
                 {
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    RoleId = table.Column<string>(type: "TEXT", nullable: false)
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    RoleId = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -159,10 +181,10 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserTokens",
                 columns: table => new
                 {
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    LoginProvider = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    Value = table.Column<string>(type: "TEXT", nullable: true)
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    LoginProvider = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Value = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -179,16 +201,16 @@ namespace SurveyApp.Server.Migrations
                 name: "Surveys",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Title = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    Description = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    IsPublished = table.Column<bool>(type: "INTEGER", nullable: false),
-                    IsAnonymous = table.Column<bool>(type: "INTEGER", nullable: false),
-                    StartDate = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    EndDate = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "TEXT", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
+                    IsPublished = table.Column<bool>(type: "boolean", nullable: false),
+                    IsAnonymous = table.Column<bool>(type: "boolean", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
+                    EndDate = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -205,14 +227,16 @@ namespace SurveyApp.Server.Migrations
                 name: "UserProfiles",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    FirstName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
-                    LastName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
-                    BirthDate = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    Gender = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
-                    City = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    BirthDate = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
+                    Gender = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    City = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    Photo = table.Column<byte[]>(type: "bytea", nullable: true),
+                    PhotoContentType = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -226,19 +250,42 @@ namespace SurveyApp.Server.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "QuestionBankOptions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    QuestionBankItemId = table.Column<int>(type: "integer", nullable: false),
+                    Text = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    IsCorrect = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_QuestionBankOptions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_QuestionBankOptions_QuestionBankItems_QuestionBankItemId",
+                        column: x => x.QuestionBankItemId,
+                        principalTable: "QuestionBankItems",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Questions",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    SurveyId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Text = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: false),
-                    QuestionType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    IsRequired = table.Column<bool>(type: "INTEGER", nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false),
-                    RatingMin = table.Column<int>(type: "INTEGER", nullable: true),
-                    RatingMax = table.Column<int>(type: "INTEGER", nullable: true),
-                    Image = table.Column<byte[]>(type: "BLOB", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    SurveyId = table.Column<int>(type: "integer", nullable: false),
+                    Text = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    QuestionType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    IsRequired = table.Column<bool>(type: "boolean", nullable: false),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    HasCorrectAnswer = table.Column<bool>(type: "boolean", nullable: false),
+                    RatingMin = table.Column<int>(type: "integer", nullable: true),
+                    RatingMax = table.Column<int>(type: "integer", nullable: true),
+                    Image = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -255,12 +302,12 @@ namespace SurveyApp.Server.Migrations
                 name: "SurveyResponses",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    SurveyId = table.Column<int>(type: "INTEGER", nullable: false),
-                    UserId = table.Column<string>(type: "TEXT", nullable: true),
-                    StartedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    SubmittedAt = table.Column<DateTime>(type: "TEXT", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    SurveyId = table.Column<int>(type: "integer", nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: true),
+                    StartedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
+                    SubmittedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -283,11 +330,12 @@ namespace SurveyApp.Server.Migrations
                 name: "QuestionOptions",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    QuestionId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Text = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    QuestionId = table.Column<int>(type: "integer", nullable: false),
+                    Text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    IsCorrect = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -304,14 +352,14 @@ namespace SurveyApp.Server.Migrations
                 name: "Answers",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    SurveyResponseId = table.Column<int>(type: "INTEGER", nullable: false),
-                    QuestionId = table.Column<int>(type: "INTEGER", nullable: false),
-                    TextAnswer = table.Column<string>(type: "TEXT", maxLength: 4000, nullable: true),
-                    NumberAnswer = table.Column<double>(type: "REAL", nullable: true),
-                    RatingAnswer = table.Column<int>(type: "INTEGER", nullable: true),
-                    YesNoAnswer = table.Column<bool>(type: "INTEGER", nullable: true)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    SurveyResponseId = table.Column<int>(type: "integer", nullable: false),
+                    QuestionId = table.Column<int>(type: "integer", nullable: false),
+                    TextAnswer = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    NumberAnswer = table.Column<double>(type: "double precision", nullable: true),
+                    RatingAnswer = table.Column<int>(type: "integer", nullable: true),
+                    YesNoAnswer = table.Column<bool>(type: "boolean", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -334,10 +382,10 @@ namespace SurveyApp.Server.Migrations
                 name: "AnswerOptions",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    AnswerId = table.Column<int>(type: "INTEGER", nullable: false),
-                    QuestionOptionId = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    AnswerId = table.Column<int>(type: "integer", nullable: false),
+                    QuestionOptionId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -419,6 +467,11 @@ namespace SurveyApp.Server.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_QuestionBankOptions_QuestionBankItemId",
+                table: "QuestionBankOptions",
+                column: "QuestionBankItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_QuestionOptions_QuestionId",
                 table: "QuestionOptions",
                 column: "QuestionId");
@@ -475,6 +528,9 @@ namespace SurveyApp.Server.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "QuestionBankOptions");
+
+            migrationBuilder.DropTable(
                 name: "UserProfiles");
 
             migrationBuilder.DropTable(
@@ -485,6 +541,9 @@ namespace SurveyApp.Server.Migrations
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
+
+            migrationBuilder.DropTable(
+                name: "QuestionBankItems");
 
             migrationBuilder.DropTable(
                 name: "SurveyResponses");

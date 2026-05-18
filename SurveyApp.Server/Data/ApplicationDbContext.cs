@@ -186,6 +186,17 @@ namespace SurveyApp.Server.Data
                     .IsRequired()
                     .HasMaxLength(500);
             });
+
+            foreach (var entityType in builder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                    {
+                        property.SetColumnType("timestamp without time zone");
+                    }
+                }
+            }
         }
     }
 }
