@@ -1,0 +1,196 @@
+@page "/user/results/{ResponseId:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SurveyApp.Server.DTOs.UserResults
+@using SurveyApp.Server.Services.Interfaces
+@inject IUserResultsService UserResultsService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "User")]
+
+<PageTitle>Подробности результата</PageTitle>
+
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Подробности результата</h3>
+            <p class="survey-page-subtitle">Ваши ответы по выбранному прохождению</p>
+        </div>
+
+        <div class="survey-header-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+                ← Назад к результатам
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка подробностей...</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (result is null)
+    {
+        <div class="alert alert-warning">Результат не найден.</div>
+    }
+    else
+    {
+        <section class="survey-section-card">
+            <h4>@result.SurveyTitle</h4>
+
+            @if (!string.IsNullOrWhiteSpace(result.SurveyDescription))
+            {
+                <p class="text-muted mt-2 mb-3">@result.SurveyDescription</p>
+            }
+
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-light text-dark border">
+                    Дата прохождения: @FormatDateTime(result.SubmittedAt)
+                </span>
+                <span class="badge bg-light text-dark border">
+                    Вопросов: @result.QuestionsCount
+                </span>
+                <span class="badge bg-light text-dark border">
+                    Ответов: @result.AnswersCount
+                </span>
+                <span class="badge bg-success">
+                    @DisplayStatus(result.Status)
+                </span>
+            </div>
+        </section>
+
+        <section class="survey-section-card">
+            <div class="survey-section-header">
+                <h4 class="survey-section-title">Ответы</h4>
+            </div>
+
+            @if (result.Answers.Count == 0)
+            {
+                <div class="survey-empty-state">
+                    <div class="survey-empty-title">Ответы не найдены</div>
+                    <div class="survey-empty-text">В этом прохождении нет сохранённых ответов.</div>
+                </div>
+            }
+            else
+            {
+                @for (int i = 0; i < result.Answers.Count; i++)
+                {
+                    var answer = result.Answers[i];
+
+                    <div class="card mb-3 shadow-sm border-0">
+                        <div class="card-body">
+                            <h5 class="mb-2">@(i + 1). @answer.QuestionText</h5>
+
+                            @if (answer.QuestionImage is not null)
+                            {
+                                <div class="my-3">
+                                    <img src="data:image/jpeg;base64,@Convert.ToBase64String(answer.QuestionImage)"
+                                         alt="Изображение вопроса"
+                                         class="img-fluid rounded border"
+                                         style="max-width: 400px; max-height: 400px;" />
+                                </div>
+                            }
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="badge bg-light text-dark border">
+                                    @GetQuestionTypeLabel(answer.QuestionType)
+                                </span>
+                            </div>
+
+                            <div class="answer-value">
+                                <strong>Ваш ответ:</strong> @DisplayAnswer(answer.AnswerText)
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int ResponseId { get; set; }
+
+    private UserSurveyResultDetailsDto? result;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDetails();
+    }
+
+    private async Task LoadDetails()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var userId = await GetCurrentUserIdAsync();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            result = await UserResultsService.GetResultDetailsAsync(userId, ResponseId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке результата: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<string?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/user/results");
+    }
+
+    private static string FormatDateTime(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Не указано";
+    }
+
+    private static string DisplayStatus(string? status)
+    {
+        return string.IsNullOrWhiteSpace(status) ? "Отправлено" : status;
+    }
+
+    private static string DisplayAnswer(string? answer)
+    {
+        return string.IsNullOrWhiteSpace(answer) ? "Ответ не указан" : answer;
+    }
+
+    private static string GetQuestionTypeLabel(string questionType)
+    {
+        return questionType switch
+        {
+            "SingleChoice" => "Один вариант ответа",
+            "MultipleChoice" => "Несколько вариантов ответа",
+            "Text" => "Текстовый ответ",
+            "Number" => "Числовой ответ",
+            "Rating" => "Рейтинг",
+            "YesNo" => "Да / Нет",
+            _ => questionType
+        };
+    }
+}

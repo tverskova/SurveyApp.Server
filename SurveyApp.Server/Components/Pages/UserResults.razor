@@ -1,0 +1,231 @@
+@page "/user/results"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SurveyApp.Server.DTOs.UserResults
+@using SurveyApp.Server.Services.Interfaces
+@inject IUserResultsService UserResultsService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize(Roles = "User")]
+
+<PageTitle>Мои результаты</PageTitle>
+
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Мои результаты</h3>
+            <p class="survey-page-subtitle">История пройденных опросов и отправленных ответов</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <section class="survey-section-card">
+            <p class="mb-0">Загрузка результатов...</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (summary is null || summary.CompletedSurveysCount == 0)
+    {
+        <section class="survey-section-card">
+            <div class="survey-empty-state">
+                <div class="survey-empty-title">Вы ещё не проходили опросы</div>
+                <div class="survey-empty-text">После отправки ответов ваши результаты появятся на этой странице.</div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="statistics-summary-grid user-results-summary-grid">
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Пройдено опросов</div>
+                <div class="statistics-summary-value">@summary.CompletedSurveysCount</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Отправлено ответов</div>
+                <div class="statistics-summary-value">@summary.SentAnswersCount</div>
+            </div>
+
+            <div class="statistics-summary-card">
+                <div class="statistics-summary-label">Последнее прохождение</div>
+                <div class="statistics-summary-value user-results-date-value">@FormatDateTime(summary.LastSubmittedAt)</div>
+            </div>
+        </section>
+
+        <section class="survey-section-card">
+            <div class="survey-section-header survey-section-header-between user-results-header">
+                <div>
+                    <h4 class="survey-section-title">Пройденные опросы</h4>
+                    <p class="survey-section-subtitle">Найдите нужный опрос и откройте подробности ответов</p>
+                </div>
+            </div>
+
+            <div class="user-results-filters mb-3">
+                <div class="search-input-wrap">
+                    <input class="form-control search-input-with-clear"
+                           placeholder="Поиск по названию опроса..."
+                           @bind="searchText" />
+
+                    @if (!string.IsNullOrWhiteSpace(searchText))
+                    {
+                        <button type="button"
+                                class="search-clear-btn"
+                                title="Очистить поиск"
+                                @onclick="ClearSearch">
+                            ✕
+                        </button>
+                    }
+                </div>
+
+                <select class="form-select" @bind="sortDirection">
+                    <option value="Newest">Сначала новые</option>
+                    <option value="Oldest">Сначала старые</option>
+                </select>
+            </div>
+
+            @if (FilteredResults.Count == 0)
+            {
+                <div class="survey-empty-state">
+                    <div class="survey-empty-title">Результаты не найдены</div>
+                    <div class="survey-empty-text">Попробуйте изменить строку поиска.</div>
+                </div>
+            }
+            else
+            {
+                <div class="user-results-list">
+                    @foreach (var result in FilteredResults)
+                    {
+                        <div class="card shadow-sm border-0 user-result-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                                    <div class="user-result-card-main">
+                                        <h5 class="card-title mb-2">@result.SurveyTitle</h5>
+
+                                        @if (!string.IsNullOrWhiteSpace(result.SurveyDescription))
+                                        {
+                                            <p class="card-text text-muted mb-3">@result.SurveyDescription</p>
+                                        }
+
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-light text-dark border">
+                                                Дата: @FormatDateTime(result.SubmittedAt)
+                                            </span>
+                                            <span class="badge bg-light text-dark border">
+                                                Вопросов: @result.QuestionsCount
+                                            </span>
+                                            <span class="badge bg-light text-dark border">
+                                                Ответов: @result.AnswersCount
+                                            </span>
+                                            <span class="badge bg-success">
+                                                @DisplayStatus(result.Status)
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            @onclick="@(() => OpenDetails(result.ResponseId))">
+                                        Подробнее
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private UserResultsSummaryDto? summary;
+    private List<UserSurveyResultListItemDto> results = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string searchText = string.Empty;
+    private string sortDirection = "Newest";
+
+    private List<UserSurveyResultListItemDto> FilteredResults
+    {
+        get
+        {
+            IEnumerable<UserSurveyResultListItemDto> query = results;
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                query = query.Where(r =>
+                    r.SurveyTitle.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+            }
+
+            query = sortDirection == "Oldest"
+                ? query.OrderBy(r => r.SubmittedAt ?? DateTime.MaxValue)
+                : query.OrderByDescending(r => r.SubmittedAt ?? DateTime.MinValue);
+
+            return query.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadResults();
+    }
+
+    private async Task LoadResults()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var userId = await GetCurrentUserIdAsync();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            summary = await UserResultsService.GetSummaryAsync(userId);
+            results = await UserResultsService.GetResultsAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при загрузке результатов: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<string?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    private void OpenDetails(int responseId)
+    {
+        NavigationManager.NavigateTo($"/user/results/{responseId}");
+    }
+
+    private void ClearSearch()
+    {
+        searchText = string.Empty;
+    }
+
+    private static string FormatDateTime(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Не указано";
+    }
+
+    private static string DisplayStatus(string? status)
+    {
+        return string.IsNullOrWhiteSpace(status) ? "Отправлено" : status;
+    }
+}
