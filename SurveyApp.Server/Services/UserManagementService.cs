@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SurveyApp.Server.Data;
@@ -247,3 +247,4 @@ namespace SurveyApp.Server.Services
         }
     }
 }
+

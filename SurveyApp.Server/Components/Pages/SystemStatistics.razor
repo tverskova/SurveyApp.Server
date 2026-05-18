@@ -54,11 +54,6 @@
                 <div class="statistics-summary-label">Активные</div>
                 <div class="statistics-summary-value">@statistics.ActiveSurveys</div>
             </div>
-
-            <div class="statistics-summary-card">
-                <div class="statistics-summary-label">Всего прохождений</div>
-                <div class="statistics-summary-value">@statistics.TotalResponses</div>
-            </div>
         </section>
 
         <section class="survey-section-card">
@@ -68,20 +63,31 @@
                     <p class="survey-section-subtitle">Просмотр статистики по каждому опросу</p>
                 </div>
 
-                <div class="search-input-wrap statistics-search-wrap">
-                    <input class="form-control search-input-with-clear"
-                           placeholder="Поиск по названию..."
-                           @bind="searchText" />
+                <div class="statistics-filters-grid">
+                    <div class="search-input-wrap statistics-search-wrap">
+                        <input class="form-control search-input-with-clear"
+                               placeholder="Поиск по названию..."
+                               @bind="searchText" />
 
-                    @if (!string.IsNullOrWhiteSpace(searchText))
-                    {
-                        <button type="button"
-                                class="search-clear-btn"
-                                title="Очистить поиск"
-                                @onclick="ClearSearch">
-                            ✕
-                        </button>
-                    }
+                        @if (!string.IsNullOrWhiteSpace(searchText))
+                        {
+                            <button type="button"
+                                    class="search-clear-btn"
+                                    title="Очистить поиск"
+                                    @onclick="ClearSearch">
+                                x
+                            </button>
+                        }
+                    </div>
+
+                    <div class="survey-field statistics-status-filter">
+                        <label class="form-label">Статус</label>
+                        <select class="form-select" @bind="statusFilter">
+                            <option value="All">Все</option>
+                            <option value="Draft">Черновик</option>
+                            <option value="Published">Опубликовано</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -89,7 +95,7 @@
             {
                 <div class="survey-empty-state">
                     <div class="survey-empty-title">Опросы не найдены</div>
-                    <div class="survey-empty-text">Попробуйте изменить строку поиска.</div>
+                    <div class="survey-empty-text">Попробуйте изменить строку поиска или фильтр статуса.</div>
                 </div>
             }
             else
@@ -142,11 +148,15 @@
     private bool isLoading = true;
     private string? errorMessage;
     private string searchText = string.Empty;
+    private string statusFilter = "All";
 
     private List<SystemSurveyStatisticsItemDto> FilteredSurveys =>
         statistics?.Surveys
             .Where(s => string.IsNullOrWhiteSpace(searchText)
                 || s.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .Where(s => statusFilter == "All"
+                || (statusFilter == "Published" && s.IsPublished)
+                || (statusFilter == "Draft" && !s.IsPublished))
             .ToList()
         ?? new();
 

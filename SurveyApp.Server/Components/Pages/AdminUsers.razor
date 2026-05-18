@@ -1,4 +1,4 @@
-@page "/admin/users"
+﻿@page "/admin/users"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
@@ -94,27 +94,36 @@
                                 class="search-clear-btn"
                                 title="Очистить поиск"
                                 @onclick="ClearSearch">
-                            ✕
+                            x
                         </button>
                     }
                 </div>
 
-                <select class="form-select" @bind="roleFilter">
-                    <option value="All">Все роли</option>
-                    <option value="Admin">Admin</option>
-                    <option value="User">User</option>
-                </select>
+                <div class="survey-field users-filter-field">
+                    <label class="form-label">Роль</label>
+                    <select class="form-select" @bind="roleFilter">
+                        <option value="All">Все роли</option>
+                        <option value="Admin">Admin</option>
+                        <option value="User">User</option>
+                    </select>
+                </div>
 
-                <select class="form-select" @bind="sortBy">
-                    <option value="Email">Сортировка: email</option>
-                    <option value="CompletedSurveys">Сортировка: прохождения</option>
-                    <option value="LastSubmittedAt">Сортировка: последнее прохождение</option>
-                </select>
+                <div class="survey-field users-filter-field">
+                    <label class="form-label">Сортировать по</label>
+                    <select class="form-select" @bind="sortBy">
+                        <option value="Email">Email</option>
+                        <option value="CompletedSurveys">Прохождениям</option>
+                        <option value="LastSubmittedAt">Последнему прохождению</option>
+                    </select>
+                </div>
 
-                <select class="form-select" @bind="sortDirection">
-                    <option value="Asc">По возрастанию</option>
-                    <option value="Desc">По убыванию</option>
-                </select>
+                <div class="survey-field users-filter-field">
+                    <label class="form-label">Порядок</label>
+                    <select class="form-select" @bind="sortDirection">
+                        <option value="Asc">По возрастанию</option>
+                        <option value="Desc">По убыванию</option>
+                    </select>
+                </div>
             </div>
 
             @if (FilteredUsers.Count == 0)
@@ -136,7 +145,7 @@
                                 <th>Город</th>
                                 <th>Дата рождения</th>
                                 <th>Роли</th>
-                                <th>Пройдено опросов</th>
+                                <th>Пройдено</th>
                                 <th>Ответов</th>
                                 <th>Последнее прохождение</th>
                                 <th>Действия</th>
@@ -146,10 +155,10 @@
                             @foreach (var user in FilteredUsers)
                             {
                                 <tr>
-                                    <td>@Display(user.Email)</td>
-                                    <td>@Display(user.FirstName)</td>
-                                    <td>@Display(user.LastName)</td>
-                                    <td>@Display(user.City)</td>
+                                    <td class="users-text-cell" title="@Display(user.Email)">@Display(user.Email)</td>
+                                    <td class="users-text-cell" title="@Display(user.FirstName)">@Display(user.FirstName)</td>
+                                    <td class="users-text-cell" title="@Display(user.LastName)">@Display(user.LastName)</td>
+                                    <td class="users-text-cell" title="@Display(user.City)">@Display(user.City)</td>
                                     <td>@FormatDate(user.BirthDate)</td>
                                     <td>
                                         <div class="users-role-list">
@@ -172,38 +181,29 @@
                                     <td>
                                         <div class="users-actions-cell">
                                             <button type="button"
-                                                    class="btn btn-info btn-sm"
-                                                    disabled="@user.Roles.Contains("Admin")"
-                                                    @onclick='@(() => SetRole(user.UserId, "Admin", true))'>
-                                                Назначить Admin
-                                            </button>
-
-                                            <button type="button"
-                                                    class="btn btn-warning btn-sm"
-                                                    disabled="@(!user.Roles.Contains("Admin"))"
-                                                    @onclick='@(() => SetRole(user.UserId, "Admin", false))'>
-                                                Снять Admin
-                                            </button>
-
-                                            <button type="button"
-                                                    class="btn btn-info btn-sm"
-                                                    disabled="@user.Roles.Contains("User")"
-                                                    @onclick='@(() => SetRole(user.UserId, "User", true))'>
-                                                Назначить User
-                                            </button>
-
-                                            <button type="button"
-                                                    class="btn btn-warning btn-sm"
-                                                    disabled="@(!user.Roles.Contains("User"))"
-                                                    @onclick='@(() => SetRole(user.UserId, "User", false))'>
-                                                Снять User
-                                            </button>
-
-                                            <button type="button"
                                                     class="btn btn-success btn-sm"
                                                     @onclick='@(() => OpenDetails(user.UserId))'>
                                                 Статистика
                                             </button>
+
+                                            <select class="form-select form-select-sm users-role-action-select"
+                                                    value=""
+                                                    @onchange="e => ApplyRoleAction(user, e.Value?.ToString())">
+                                                <option value="">Действие с ролью</option>
+                                                @if (user.Roles.Contains("Admin"))
+                                                {
+                                                    <option value="make-user">Назначить пользователем</option>
+                                                }
+                                                else if (user.Roles.Contains("User"))
+                                                {
+                                                    <option value="make-admin">Назначить администратором</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="make-user">Назначить пользователем</option>
+                                                    <option value="make-admin">Назначить администратором</option>
+                                                }
+                                            </select>
                                         </div>
                                     </td>
                                 </tr>
@@ -292,7 +292,48 @@
         }
     }
 
-    private async Task SetRole(string userId, string roleName, bool assign)
+    private async Task ApplyRoleAction(UserListItemDto user, string? action)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+            return;
+
+        if (action == "make-admin")
+        {
+            await AssignAsAdmin(user.UserId);
+            return;
+        }
+
+        if (action == "make-user")
+        {
+            await AssignAsUser(user.UserId);
+        }
+    }
+
+    private async Task AssignAsAdmin(string userId)
+    {
+        var addAdminResult = await SetRole(userId, "Admin", true, reload: false);
+        if (!addAdminResult)
+        {
+            await LoadUsers();
+            return;
+        }
+
+        await SetRole(userId, "User", false, reload: true);
+    }
+
+    private async Task AssignAsUser(string userId)
+    {
+        var removeAdminResult = await SetRole(userId, "Admin", false, reload: false);
+        if (!removeAdminResult)
+        {
+            await LoadUsers();
+            return;
+        }
+
+        await SetRole(userId, "User", true, reload: true);
+    }
+
+    private async Task<bool> SetRole(string userId, string roleName, bool assign, bool reload)
     {
         try
         {
@@ -308,15 +349,20 @@
             if (!result.Succeeded)
             {
                 errorMessage = result.Message;
-                return;
+                return false;
             }
 
             successMessage = result.Message;
-            await LoadUsers();
+
+            if (reload)
+                await LoadUsers();
+
+            return true;
         }
         catch (Exception ex)
         {
             errorMessage = $"Ошибка при изменении роли: {ex.Message}";
+            return false;
         }
     }
 
@@ -351,3 +397,4 @@
         return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-";
     }
 }
+
