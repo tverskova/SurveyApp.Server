@@ -36,14 +36,18 @@
                 }
             </div>
 
-            <div class="survey-field">
-                <label class="form-label">Статус</label>
-                <select class="form-select" @bind="statusFilter">
-                    <option value="All">Все</option>
-                    <option value="Published">Опубликован</option>
-                    <option value="Draft">Черновик</option>
-                </select>
-            </div>
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <div class="survey-field">
+                        <label class="form-label">Статус</label>
+                        <select class="form-select" @bind="statusFilter">
+                            <option value="All">Все</option>
+                            <option value="Published">Опубликован</option>
+                            <option value="Draft">Черновик</option>
+                        </select>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
         </div>
 
         @if (isLoading)
@@ -65,7 +69,7 @@
         {
             <div class="survey-empty-state">
                 <div class="survey-empty-title">Опросы не найдены</div>
-                <div class="survey-empty-text">Попробуйте изменить поисковый запрос или фильтр статуса.</div>
+                <div class="survey-empty-text">Попробуйте изменить поисковый запрос.</div>
             </div>
         }
         else
@@ -78,9 +82,13 @@
                             <div class="card-body d-flex flex-column">
                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                                     <h5 class="card-title mb-0">@survey.Title</h5>
-                                    <span class="survey-status-badge @(survey.IsPublished ? "survey-status-published" : "survey-status-draft")">
-                                        @(survey.IsPublished ? "Опубликован" : "Черновик")
-                                    </span>
+                                    <AuthorizeView Roles="Admin">
+                                        <Authorized>
+                                            <span class="survey-status-badge @(survey.IsPublished ? "survey-status-published" : "survey-status-draft")">
+                                                @(survey.IsPublished ? "Опубликован" : "Черновик")
+                                            </span>
+                                        </Authorized>
+                                    </AuthorizeView>
                                 </div>
 
                                 @if (!string.IsNullOrWhiteSpace(survey.Description))

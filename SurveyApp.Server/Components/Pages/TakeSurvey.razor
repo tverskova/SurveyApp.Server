@@ -188,32 +188,29 @@ else
                     var min = question.RatingMin ?? 1;
                     var max = question.RatingMax ?? 5;
 
-                    <div class="mt-4">
-
-                        <!-- Число по центру сверху -->
-                        <div class="text-center mb-2">
-                            <small class="text-secondary fs-6">
-                                @tempRatingAnswers[question.Id]
-                            </small>
-                        </div>
-
-                        <div class="d-flex align-items-center gap-3">
+                    <div class="rating-answer-wrap">
+                        <div class="rating-slider-row">
                             <span class="text-muted fw-semibold">@min</span>
 
-                            <input type="range"
-                                   class="form-range flex-grow-1"
-                                   min="@min"
-                                   max="@max"
-                                   value="@tempRatingAnswers[question.Id]"
-                                   @oninput="e => OnRatingChanging(question.Id, e.Value?.ToString())"
-                                   @onchange="() => ratingAnswers[question.Id] = tempRatingAnswers[question.Id]" />
+                            <div class="rating-range-wrap">
+                                <span class="rating-current-value" style="@GetSliderStyle(question.Id, min, max)">
+                                    @tempRatingAnswers[question.Id]
+                                </span>
+
+                                <input type="range"
+                                       class="form-range rating-range"
+                                       min="@min"
+                                       max="@max"
+                                       value="@tempRatingAnswers[question.Id]"
+                                       @oninput="e => OnRatingChanging(question.Id, e.Value?.ToString())" />
+                            </div>
 
                             <span class="text-muted fw-semibold">@max</span>
                         </div>
 
                         <div class="text-center mt-2">
                             <small class="text-secondary">
-                                Выбрано: <strong>@ratingAnswers[question.Id]</strong>
+                                Выбрано: <strong>@(ratingAnswers[question.Id]?.ToString() ?? "не выбрано")</strong>
                             </small>
                         </div>
 
@@ -305,7 +302,7 @@ else
     private Dictionary<int, HashSet<int>> multipleChoiceAnswers = new();
     private Dictionary<int, string?> textAnswers = new();
     private Dictionary<int, double?> numberAnswers = new();
-    private Dictionary<int, int> ratingAnswers = new();
+    private Dictionary<int, int?> ratingAnswers = new();
     private Dictionary<int, int> tempRatingAnswers = new();
     private Dictionary<int, bool?> yesNoAnswers = new();
 
@@ -338,7 +335,7 @@ else
                     numberAnswers[question.Id] = null;
 
                     var initialRating = question.RatingMin ?? 1;
-                    ratingAnswers[question.Id] = initialRating;
+                    ratingAnswers[question.Id] = null;
                     tempRatingAnswers[question.Id] = initialRating;
 
                     yesNoAnswers[question.Id] = null;
@@ -392,6 +389,7 @@ else
         if (int.TryParse(value, out var parsed))
         {
             tempRatingAnswers[questionId] = parsed;
+            ratingAnswers[questionId] = parsed;
             MarkQuestionAnswered(questionId);
         }
     }
@@ -413,14 +411,11 @@ else
         var value = tempRatingAnswers[questionId];
 
         if (max <= min)
-            return "position:absolute; left:50%; transform:translateX(-50%); top:0; font-size:0.75rem; white-space:nowrap;";
+            return "left:50%;";
 
         var percent = (double)(value - min) / (max - min) * 100;
 
-        // Небольшая поправка, чтобы надпись визуально шла над бегунком
-        var pxOffset = 8 - (percent / 100.0 * 16);
-
-        return $"position:absolute; left:calc({percent}% + {pxOffset}px); transform:translateX(-50%); top:0; font-size:0.75rem; white-space:nowrap;";
+        return $"left:{percent.ToString(System.Globalization.CultureInfo.InvariantCulture)}%;";
     }
 
     private async Task SubmitSurvey()
@@ -574,7 +569,7 @@ else
     {
         showLeaveModal = false;
         hasUnsavedAnswers = false;
-        NavigationManager.NavigateTo(string.IsNullOrWhiteSpace(pendingNavigationUrl) ? "/user-home" : pendingNavigationUrl);
+        NavigationManager.NavigateTo("/");
     }
 
     private static string GetQuestionElementId(int questionId)
@@ -650,6 +645,6 @@ else
 
     private void GoBack()
     {
-        NavigationManager.NavigateTo("/user-home");
+        NavigationManager.NavigateTo("/");
     }
 }
