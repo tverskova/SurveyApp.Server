@@ -36,18 +36,6 @@
                 }
             </div>
 
-            <AuthorizeView Roles="Admin">
-                <Authorized>
-                    <div class="survey-field">
-                        <label class="form-label">Статус</label>
-                        <select class="form-select" @bind="statusFilter">
-                            <option value="All">Все</option>
-                            <option value="Published">Опубликован</option>
-                            <option value="Draft">Черновик</option>
-                        </select>
-                    </div>
-                </Authorized>
-            </AuthorizeView>
         </div>
 
         @if (isLoading)
@@ -117,7 +105,6 @@
     private bool isLoading = true;
     private string? errorMessage;
     private string searchText = string.Empty;
-    private string statusFilter = "All";
 
     private List<SurveyListItemDto> FilteredSurveys =>
         surveys
@@ -125,9 +112,6 @@
                 || s.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase)
                 || (!string.IsNullOrWhiteSpace(s.Description)
                     && s.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
-            .Where(s => statusFilter == "All"
-                || (statusFilter == "Published" && s.IsPublished)
-                || (statusFilter == "Draft" && !s.IsPublished))
             .OrderBy(s => s.Title)
             .ToList();
 
