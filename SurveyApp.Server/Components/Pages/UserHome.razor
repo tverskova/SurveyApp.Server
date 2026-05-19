@@ -1,4 +1,4 @@
-﻿@page "/user-home"
+@page "/user-home"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using SurveyApp.Server.DTOs.Surveys
@@ -10,34 +10,110 @@
 
 <PageTitle>Опросы</PageTitle>
 
-<h3>Доступные опросы</h3>
+<div class="survey-editor-page">
+    <div class="survey-page-header">
+        <div>
+            <h3 class="survey-page-title">Доступные опросы</h3>
+            <p class="survey-page-subtitle">Выберите опубликованный опрос и отправьте ответы</p>
+        </div>
+    </div>
 
-@if (isLoading)
-{
-    <p>Загрузка опросов...</p>
-}
-else if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-else if (surveys.Count == 0)
-{
-    <p>Сейчас нет опубликованных опросов.</p>
-}
-else
-{
-    <div class="row">
-        @foreach (var survey in surveys)
+    <section class="survey-section-card">
+        <div class="available-survey-filters mb-3">
+            <div class="search-input-wrap">
+                <input class="form-control search-input-with-clear"
+                       placeholder="Поиск по названию или описанию..."
+                       @bind="searchText" />
+
+                @if (!string.IsNullOrWhiteSpace(searchText))
+                {
+                    <button type="button"
+                            class="search-clear-btn"
+                            title="Очистить поиск"
+                            @onclick="ClearSearch">
+                        x
+                    </button>
+                }
+            </div>
+
+            <div class="survey-field">
+                <label class="form-label">Статус</label>
+                <select class="form-select" @bind="statusFilter">
+                    <option value="All">Все</option>
+                    <option value="Published">Опубликован</option>
+                    <option value="Draft">Черновик</option>
+                </select>
+            </div>
+
+            <div class="survey-field">
+                <label class="form-label">Дата</label>
+                <select class="form-select" @bind="dateFilter">
+                    <option value="All">Любая</option>
+                    <option value="WithDates">Есть даты</option>
+                    <option value="WithoutDates">Без дат</option>
+                </select>
+            </div>
+
+            <div class="survey-field">
+                <label class="form-label">Доступность</label>
+                <select class="form-select" @bind="availabilityFilter">
+                    <option value="All">Все</option>
+                    <option value="Active">Доступен</option>
+                    <option value="Upcoming">Скоро начнётся</option>
+                    <option value="Expired">Завершён</option>
+                </select>
+            </div>
+        </div>
+
+        @if (isLoading)
         {
-            <div class="col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">@survey.Title</h5>
-                        <p class="card-text">@survey.Description</p>
+            <p class="mb-0">Загрузка опросов...</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        else if (surveys.Count == 0)
+        {
+            <div class="survey-empty-state">
+                <div class="survey-empty-title">Сейчас нет опубликованных опросов</div>
+                <div class="survey-empty-text">Когда администратор опубликует опрос, он появится на этой странице.</div>
+            </div>
+        }
+        else if (FilteredSurveys.Count == 0)
+        {
+            <div class="survey-empty-state">
+                <div class="survey-empty-title">Опросы не найдены</div>
+                <div class="survey-empty-text">Попробуйте изменить поиск или фильтры.</div>
+            </div>
+        }
+        else
+        {
+            <div class="available-survey-grid">
+                @foreach (var survey in FilteredSurveys)
+                {
+                    var availability = GetAvailability(survey);
 
-                        <p class="mb-1">
-                            <strong>Анонимный:</strong> @(survey.IsAnonymous ? "Да" : "Нет")
-                        </p>
+                    <article class="available-survey-card">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                            <h5 class="mb-0">@survey.Title</h5>
+                            <span class="survey-status-badge @(survey.IsPublished ? "survey-status-published" : "survey-status-draft")">
+                                @(survey.IsPublished ? "Опубликован" : "Черновик")
+                            </span>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(survey.Description))
+                        {
+                            <p class="text-muted">@survey.Description</p>
+                        }
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <span class="@GetAvailabilityBadgeClass(availability)">@GetAvailabilityLabel(availability)</span>
+                            <span class="survey-status-badge survey-status-draft">
+                                @(survey.IsAnonymous ? "Анонимный" : "Неанонимный")
+                            </span>
+                        </div>
+
                         <p class="mb-1">
                             <strong>Дата начала:</strong> @FormatDate(survey.StartDate)
                         </p>
@@ -46,20 +122,42 @@ else
                         </p>
 
                         <button class="btn btn-primary"
+                                disabled="@(availability != "Active")"
                                 @onclick="() => OpenSurvey(survey.Id)">
                             Пройти опрос
                         </button>
-                    </div>
-                </div>
+                    </article>
+                }
             </div>
         }
-    </div>
-}
+    </section>
+</div>
 
 @code {
     private List<SurveyListItemDto> surveys = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private string searchText = string.Empty;
+    private string statusFilter = "All";
+    private string dateFilter = "All";
+    private string availabilityFilter = "All";
+
+    private List<SurveyListItemDto> FilteredSurveys =>
+        surveys
+            .Where(s => string.IsNullOrWhiteSpace(searchText)
+                || s.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(s.Description)
+                    && s.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
+            .Where(s => statusFilter == "All"
+                || (statusFilter == "Published" && s.IsPublished)
+                || (statusFilter == "Draft" && !s.IsPublished))
+            .Where(s => dateFilter == "All"
+                || (dateFilter == "WithDates" && (s.StartDate.HasValue || s.EndDate.HasValue))
+                || (dateFilter == "WithoutDates" && !s.StartDate.HasValue && !s.EndDate.HasValue))
+            .Where(s => availabilityFilter == "All" || GetAvailability(s) == availabilityFilter)
+            .OrderBy(s => s.StartDate ?? DateTime.MaxValue)
+            .ThenBy(s => s.Title)
+            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,8 +187,46 @@ else
         NavigationManager.NavigateTo($"/survey/{surveyId}");
     }
 
-    private string FormatDate(DateTime? date)
+    private void ClearSearch()
     {
-        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "-";
+        searchText = string.Empty;
+    }
+
+    private static string GetAvailability(SurveyListItemDto survey)
+    {
+        var now = DateTime.Now;
+
+        if (survey.StartDate.HasValue && survey.StartDate.Value > now)
+            return "Upcoming";
+
+        if (survey.EndDate.HasValue && survey.EndDate.Value < now)
+            return "Expired";
+
+        return "Active";
+    }
+
+    private static string GetAvailabilityLabel(string availability)
+    {
+        return availability switch
+        {
+            "Upcoming" => "Скоро начнётся",
+            "Expired" => "Завершён",
+            _ => "Доступен"
+        };
+    }
+
+    private static string GetAvailabilityBadgeClass(string availability)
+    {
+        return availability switch
+        {
+            "Upcoming" => "survey-availability-badge survey-availability-upcoming",
+            "Expired" => "survey-availability-badge survey-availability-expired",
+            _ => "survey-availability-badge survey-availability-active"
+        };
+    }
+
+    private static string FormatDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "Не указано";
     }
 }

@@ -62,7 +62,7 @@
 
                 <div class="col-md-4">
                     <strong>Дата прохождения:</strong>
-                    <div>@(answers.SubmittedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</div>
+                    <div>@DateTimeDisplay.DateTime(answers.SubmittedAt)</div>
                 </div>
             </div>
         </section>

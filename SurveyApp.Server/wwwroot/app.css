@@ -713,6 +713,118 @@ input[type="date"] {
     background: #FFFFFF;
 }
 
+.app-message-modal {
+    text-align: left;
+}
+
+.password-input-wrap {
+    position: relative;
+}
+
+.password-input-wrap .form-control {
+    padding-right: 5.5rem;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: 0.55rem;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    color: #2F80ED;
+    font-weight: 700;
+    font-size: 0.84rem;
+    padding: 0.25rem 0.35rem;
+}
+
+.password-toggle-btn:hover {
+    color: #1F6FE0;
+}
+
+.available-survey-filters {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) 190px 190px 190px;
+    gap: 0.9rem;
+    align-items: end;
+}
+
+.available-survey-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.available-survey-card {
+    border: 1px solid #E7EDF5;
+    border-radius: 16px;
+    background: #FFFFFF;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    padding: 1.1rem;
+    min-width: 0;
+}
+
+.survey-status-badge,
+.survey-availability-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.survey-status-published,
+.survey-availability-active {
+    background: #E8F8EE;
+    color: #1E8E5A;
+    border: 1px solid #C7EED5;
+}
+
+.survey-status-draft,
+.survey-availability-upcoming {
+    background: #FFF7D6;
+    color: #946200;
+    border: 1px solid #F6D98B;
+}
+
+.survey-availability-expired {
+    background: #FEECEC;
+    color: #B42318;
+    border: 1px solid #F8C7C1;
+}
+
+.question-required-missing {
+    border: 1px solid #F8C7C1 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+}
+
+.question-required-missing .form-control,
+.profile-field-invalid .form-control,
+.profile-field-invalid .form-select {
+    border-color: #DC2626;
+}
+
+.profile-form-sections {
+    display: grid;
+    gap: 1rem;
+}
+
+.profile-form-section {
+    border: 1px solid #E8EEF5;
+    border-radius: 14px;
+    padding: 1rem;
+    background: #FFFFFF;
+}
+
+.profile-form-section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 0.85rem;
+}
+
 .survey-bank-categories .list-group-item.active {
     background: #2F80ED;
     border-color: #2F80ED;
@@ -1242,6 +1354,21 @@ input[type="date"] {
 
     .user-results-filters {
         grid-template-columns: 1fr;
+    }
+
+    .available-survey-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .content {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .survey-section-card,
+    .available-survey-card,
+    .statistics-summary-card {
+        border-radius: 14px;
     }
 
     .user-results-date-value {

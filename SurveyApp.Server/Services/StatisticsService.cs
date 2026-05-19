@@ -274,10 +274,10 @@ namespace SurveyApp.Server.Services
                                 summary.Item().Text($"Среднее время прохождения: {Math.Round(statistics.AverageCompletionTimeSeconds)} сек.");
 
                             if (statistics.FirstResponseDate.HasValue)
-                                summary.Item().Text($"Первый ответ: {statistics.FirstResponseDate.Value.ToLocalTime():dd.MM.yyyy HH:mm}");
+                                summary.Item().Text($"Первый ответ: {DateTimeDisplay.DateTime(statistics.FirstResponseDate)}");
 
                             if (statistics.LastResponseDate.HasValue)
-                                summary.Item().Text($"Последний ответ: {statistics.LastResponseDate.Value.ToLocalTime():dd.MM.yyyy HH:mm}");
+                                summary.Item().Text($"Последний ответ: {DateTimeDisplay.DateTime(statistics.LastResponseDate)}");
                         });
 
                         for (int i = 0; i < statistics.Questions.Count; i++)
@@ -381,10 +381,12 @@ namespace SurveyApp.Server.Services
             summarySheet.Cell(3, 2).Value = Math.Round(statistics.AverageCompletionTimeSeconds);
 
             summarySheet.Cell(4, 1).Value = "Первый ответ";
-            summarySheet.Cell(4, 2).Value = statistics.FirstResponseDate?.ToLocalTime();
+            if (statistics.FirstResponseDate.HasValue)
+                summarySheet.Cell(4, 2).Value = DateTimeDisplay.ToMoscow(statistics.FirstResponseDate.Value);
 
             summarySheet.Cell(5, 1).Value = "Последний ответ";
-            summarySheet.Cell(5, 2).Value = statistics.LastResponseDate?.ToLocalTime();
+            if (statistics.LastResponseDate.HasValue)
+                summarySheet.Cell(5, 2).Value = DateTimeDisplay.ToMoscow(statistics.LastResponseDate.Value);
 
             summarySheet.Columns().AdjustToContents();
 

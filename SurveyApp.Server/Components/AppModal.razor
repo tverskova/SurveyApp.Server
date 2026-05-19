@@ -1,0 +1,61 @@
+@if (IsOpen)
+{
+    <div class="survey-modal-backdrop">
+        <div class="survey-modal-window survey-modal-window-md app-message-modal">
+            <div class="survey-modal-header">
+                <h5 class="mb-0">@Title</h5>
+                @if (ShowCloseButton)
+                {
+                    <button type="button" class="btn-close" @onclick="CloseAsync"></button>
+                }
+            </div>
+
+            <div class="survey-modal-body">
+                <p class="mb-0">@Message</p>
+            </div>
+
+            <div class="survey-modal-footer">
+                @if (ShowCancel)
+                {
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelAsync">
+                        @CancelText
+                    </button>
+                }
+
+                <button type="button" class="@PrimaryButtonClass" @onclick="CloseAsync">
+                    @ConfirmText
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = "Уведомление";
+    [Parameter] public string Message { get; set; } = string.Empty;
+    [Parameter] public string ConfirmText { get; set; } = "ОК";
+    [Parameter] public string CancelText { get; set; } = "Отмена";
+    [Parameter] public string Variant { get; set; } = "primary";
+    [Parameter] public bool ShowCancel { get; set; }
+    [Parameter] public bool ShowCloseButton { get; set; } = true;
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string PrimaryButtonClass => Variant switch
+    {
+        "danger" => "btn btn-danger",
+        "success" => "btn btn-success",
+        _ => "btn btn-primary"
+    };
+
+    private async Task CloseAsync()
+    {
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancel.InvokeAsync();
+    }
+}

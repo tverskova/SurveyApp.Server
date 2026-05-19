@@ -31,6 +31,18 @@
            target="_blank">
         Экспорт Excel
     </a>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
+        <label class="form-label mb-0">Тип диаграммы</label>
+        <select class="form-select form-select-sm" style="width: 170px;"
+                value="@chartTypePreference"
+                @onchange="OnChartTypeChanged">
+            <option value="Auto">Автоматически</option>
+            <option value="pie">Круговая</option>
+            <option value="bar">Столбчатая</option>
+            <option value="line">Линейная</option>
+        </select>
+    </div>
 </div>
 
 @if (isLoading)
@@ -80,7 +92,7 @@ else
                     </div>
 
                     <div class="fw-bold">
-                        @(statistics.FirstResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                        @DateTimeDisplay.DateTime(statistics.FirstResponseDate)
                     </div>
                 </div>
             </div>
@@ -94,7 +106,7 @@ else
                     </div>
 
                     <div class="fw-bold">
-                        @(statistics.LastResponseDate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                        @DateTimeDisplay.DateTime(statistics.LastResponseDate)
                     </div>
                 </div>
             </div>
@@ -149,7 +161,7 @@ else
                                         </td>
 
                                         <td>
-                                            @(participant.SubmittedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                                            @DateTimeDisplay.DateTime(participant.SubmittedAt)
                                         </td>
 
                                         <td class="text-end">
@@ -253,6 +265,7 @@ else
 
     private string? errorMessage;
     private bool chartsRendered;
+    private string chartTypePreference = "Auto";
 
     protected override async Task OnInitializedAsync()
     {
@@ -315,6 +328,9 @@ else
 
     private string GetChartType(string type)
     {
+        if (chartTypePreference != "Auto")
+            return chartTypePreference;
+
         return type switch
         {
             "SingleChoice" => "bar",
@@ -324,6 +340,13 @@ else
             "Number" => "bar",
             _ => "bar"
         };
+    }
+
+    private async Task OnChartTypeChanged(ChangeEventArgs e)
+    {
+        chartTypePreference = e.Value?.ToString() ?? "Auto";
+        chartsRendered = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void GoBack()

@@ -221,7 +221,7 @@
 
     private static string FormatDateTime(DateTime? date)
     {
-        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Не указано";
+        return DateTimeDisplay.DateTime(date);
     }
 
     private static string DisplayStatus(string? status)

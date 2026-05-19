@@ -6,6 +6,7 @@ using SurveyApp.Server.Components.Account;
 using SurveyApp.Server.Data;
 using SurveyApp.Server.Services;
 using SurveyApp.Server.Services.Interfaces;
+using SurveyApp.Server;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -60,6 +61,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
 })
 .AddRoles<IdentityRole>()
+.AddErrorDescriber<RussianIdentityErrorDescriber>()
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddSignInManager()
 .AddDefaultTokenProviders();

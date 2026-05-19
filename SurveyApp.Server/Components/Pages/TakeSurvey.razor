@@ -10,6 +10,7 @@
 @inject IResponseService ResponseService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 @attribute [Authorize(Roles = "User,Admin")]
 
@@ -30,10 +31,6 @@ else if (!string.IsNullOrWhiteSpace(errorMessage))
     <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
         Назад
     </button>
-}
-else if (!string.IsNullOrWhiteSpace(successMessage))
-{
-    <div class="alert alert-success">@successMessage</div>
 }
 else if (survey is null)
 {
@@ -105,7 +102,8 @@ else
         var questionIndex = i;
         var question = orderedQuestions[questionIndex];
 
-        <div class="card mb-3 shadow-sm border-0">
+        <div id="@GetQuestionElementId(question.Id)"
+             class="card mb-3 shadow-sm border-0 @(missingRequiredQuestionIds.Contains(question.Id) ? "question-required-missing" : "")">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                     <div>
@@ -262,6 +260,13 @@ else
     </div>
 }
 
+<AppModal IsOpen="@showSurveyModal"
+          Title="@modalTitle"
+          Message="@modalMessage"
+          Variant="@modalVariant"
+          ConfirmText="ОК"
+          OnConfirm="CloseSurveyModal" />
+
 @code {
     [Parameter]
     public int Id { get; set; }
@@ -272,7 +277,12 @@ else
     private bool isLoading = true;
     private bool isSubmitting;
     private string? errorMessage;
-    private string? successMessage;
+    private bool redirectAfterModal;
+    private bool showSurveyModal;
+    private string modalTitle = "Уведомление";
+    private string modalMessage = string.Empty;
+    private string modalVariant = "primary";
+    private HashSet<int> missingRequiredQuestionIds = new();
 
     private Dictionary<int, int?> singleChoiceAnswers = new();
     private Dictionary<int, HashSet<int>> multipleChoiceAnswers = new();
@@ -293,7 +303,7 @@ else
         {
             isLoading = true;
             errorMessage = null;
-            successMessage = null;
+            missingRequiredQuestionIds.Clear();
 
             survey = await SurveyService.GetSurveyDetailsAsync(Id);
 
@@ -336,6 +346,7 @@ else
     private void SetSingleChoice(int questionId, int optionId)
     {
         singleChoiceAnswers[questionId] = optionId;
+        missingRequiredQuestionIds.Remove(questionId);
     }
 
     private bool IsMultipleChoiceSelected(int questionId, int optionId)
@@ -352,6 +363,9 @@ else
             multipleChoiceAnswers[questionId].Add(optionId);
         else
             multipleChoiceAnswers[questionId].Remove(optionId);
+
+        if (multipleChoiceAnswers[questionId].Count > 0)
+            missingRequiredQuestionIds.Remove(questionId);
     }
 
     private void OnRatingChanging(int questionId, string? value)
@@ -359,6 +373,7 @@ else
         if (int.TryParse(value, out var parsed))
         {
             tempRatingAnswers[questionId] = parsed;
+            missingRequiredQuestionIds.Remove(questionId);
         }
     }
 
@@ -386,7 +401,7 @@ else
         {
             isSubmitting = true;
             errorMessage = null;
-            successMessage = null;
+            missingRequiredQuestionIds.Clear();
 
             var dto = new SubmitSurveyResponseDto
             {
@@ -436,11 +451,18 @@ else
 
                 if (question.IsRequired && IsAnswerEmpty(question, answerDto))
                 {
-                    errorMessage = $"Заполните обязательный вопрос: {question.Text}";
-                    return;
+                    missingRequiredQuestionIds.Add(question.Id);
                 }
 
                 dto.Answers.Add(answerDto);
+            }
+
+            if (missingRequiredQuestionIds.Count > 0)
+            {
+                isSubmitting = false;
+                ShowSurveyModal("Не заполнены обязательные вопросы", "Ответьте на все обязательные вопросы", "danger");
+                await JS.InvokeVoidAsync("surveyUi.scrollToElement", GetQuestionElementId(missingRequiredQuestionIds.First()));
+                return;
             }
 
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -450,17 +472,16 @@ else
 
             if (result == null)
             {
-                errorMessage = "Не удалось сохранить ответы.";
+                ShowSurveyModal("Ошибка отправки", "Не удалось сохранить ответы.", "danger");
                 return;
             }
 
-            successMessage = "Ответы успешно отправлены.";
-            await Task.Delay(800);
-            NavigationManager.NavigateTo("/user-home");
+            redirectAfterModal = true;
+            ShowSurveyModal("Опрос пройден", "Ответы успешно отправлены. Спасибо за прохождение опроса", "success");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при отправке ответов: {ex.Message}";
+            ShowSurveyModal("Ошибка отправки", $"Ошибка при отправке ответов: {ex.Message}", "danger");
         }
         finally
         {
@@ -480,6 +501,29 @@ else
             "YesNo" => answer.YesNoAnswer == null,
             _ => true
         };
+    }
+
+    private void ShowSurveyModal(string title, string message, string variant)
+    {
+        modalTitle = title;
+        modalMessage = message;
+        modalVariant = variant;
+        showSurveyModal = true;
+    }
+
+    private void CloseSurveyModal()
+    {
+        showSurveyModal = false;
+
+        if (redirectAfterModal)
+        {
+            NavigationManager.NavigateTo("/user-home");
+        }
+    }
+
+    private static string GetQuestionElementId(int questionId)
+    {
+        return $"question_{questionId}";
     }
 
     private int AnsweredCount()

@@ -1,4 +1,4 @@
-﻿@page "/Account/Manage"
+@page "/Account/Manage"
 @rendermode InteractiveServer
 
 @using System.ComponentModel.DataAnnotations
@@ -21,6 +21,8 @@
 
 <PageTitle>Личный кабинет</PageTitle>
 
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
 @if (isLoading)
 {
     <div class="survey-section-card">
@@ -30,16 +32,6 @@
 else
 {
     <div class="survey-editor-page">
-        @if (!string.IsNullOrWhiteSpace(successMessage))
-        {
-            <div class="alert alert-success">@successMessage</div>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <div class="alert alert-danger">@errorMessage</div>
-        }
-
         <section class="survey-section-card">
             <div class="manage-profile-layout">
                 <div class="manage-profile-photo-block">
@@ -67,7 +59,7 @@ else
                         {
                             <button type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    @onclick="ConfirmAndRemovePhoto">
+                                    @onclick="OpenRemovePhotoModal">
                                 Удалить фото
                             </button>
                         }
@@ -75,80 +67,104 @@ else
                 </div>
 
                 <div class="manage-profile-form-block">
-                    <EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync" class="auth-form">
+                    <EditForm EditContext="editContext" OnValidSubmit="OnValidSubmitAsync" OnInvalidSubmit="OnInvalidSubmit" class="auth-form">
                         <DataAnnotationsValidator />
-                        <ValidationSummary class="text-danger mb-3" role="alert" />
 
-                        <div class="survey-meta-grid">
-                            <div class="survey-field survey-field-full">
-                                <label for="username" class="form-label">Имя пользователя</label>
-                                <input type="text"
-                                       value="@username"
-                                       id="username"
-                                       class="form-control"
-                                       disabled />
+                        <div class="profile-form-sections">
+                            <div class="profile-form-section">
+                                <div class="profile-form-section-title">Личные данные</div>
+                                <div class="survey-meta-grid">
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.FirstName)) ? "profile-field-invalid" : "")">
+                                        <label for="firstName" class="form-label">Имя</label>
+                                        <InputText @bind-Value="Input.FirstName"
+                                                   id="firstName"
+                                                   class="form-control"
+                                                   placeholder="Введите имя"
+                                                   @oninput="MarkDirty" />
+                                        <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+                                    </div>
+
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.LastName)) ? "profile-field-invalid" : "")">
+                                        <label for="lastName" class="form-label">Фамилия</label>
+                                        <InputText @bind-Value="Input.LastName"
+                                                   id="lastName"
+                                                   class="form-control"
+                                                   placeholder="Введите фамилию"
+                                                   @oninput="MarkDirty" />
+                                        <ValidationMessage For="() => Input.LastName" class="text-danger" />
+                                    </div>
+
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.BirthDate)) ? "profile-field-invalid" : "")">
+                                        <label for="birthDate" class="form-label">Дата рождения</label>
+                                        <InputDate @bind-Value="Input.BirthDate"
+                                                   @bind-Value:after="MarkDirty"
+                                                   id="birthDate"
+                                                   class="form-control" />
+                                        <ValidationMessage For="() => Input.BirthDate" class="text-danger" />
+                                    </div>
+
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.Gender)) ? "profile-field-invalid" : "")">
+                                        <label for="gender" class="form-label">Пол</label>
+                                        <InputSelect @bind-Value="Input.Gender"
+                                                     @bind-Value:after="MarkDirty"
+                                                     id="gender"
+                                                     class="form-select">
+                                            <option value="">Не указано</option>
+                                            <option value="Мужской">Мужской</option>
+                                            <option value="Женский">Женский</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="() => Input.Gender" class="text-danger" />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="survey-field">
-                                <label for="email" class="form-label">Электронная почта</label>
-                                <input type="text"
-                                       value="@email"
-                                       id="email"
-                                       class="form-control"
-                                       disabled />
+                            <div class="profile-form-section">
+                                <div class="profile-form-section-title">Контактные данные</div>
+                                <div class="survey-meta-grid">
+                                    <div class="survey-field">
+                                        <label for="email" class="form-label">Электронная почта</label>
+                                        <input type="text"
+                                               value="@email"
+                                               id="email"
+                                               class="form-control"
+                                               disabled />
+                                    </div>
+
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.PhoneNumber)) ? "profile-field-invalid" : "")">
+                                        <label for="phone" class="form-label">Телефон</label>
+                                        <InputText @bind-Value="Input.PhoneNumber"
+                                                   id="phone"
+                                                   class="form-control"
+                                                   placeholder="+7XXXXXXXXXX"
+                                                   @onfocus="EnsurePhonePrefix"
+                                                   @oninput="OnPhoneInput" />
+                                        <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+                                    </div>
+
+                                    <div class="survey-field survey-field-full @(IsFieldInvalid(nameof(Input.City)) ? "profile-field-invalid" : "")">
+                                        <label for="city" class="form-label">Город</label>
+                                        <InputText @bind-Value="Input.City"
+                                                   id="city"
+                                                   class="form-control"
+                                                   placeholder="Введите город"
+                                                   @oninput="MarkDirty" />
+                                        <ValidationMessage For="() => Input.City" class="text-danger" />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="survey-field">
-                                <label for="phone" class="form-label">Телефон</label>
-                                <InputText @bind-Value="Input.PhoneNumber"
-                                           id="phone"
-                                           class="form-control"
-                                           placeholder="+7XXXXXXXXXX" />
-                                <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
-                            </div>
-
-                            <div class="survey-field">
-                                <label for="firstName" class="form-label">Имя</label>
-                                <InputText @bind-Value="Input.FirstName"
-                                           id="firstName"
-                                           class="form-control"
-                                           placeholder="Введите имя" />
-                                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
-                            </div>
-
-                            <div class="survey-field">
-                                <label for="lastName" class="form-label">Фамилия</label>
-                                <InputText @bind-Value="Input.LastName"
-                                           id="lastName"
-                                           class="form-control"
-                                           placeholder="Введите фамилию" />
-                                <ValidationMessage For="() => Input.LastName" class="text-danger" />
-                            </div>
-
-                            <div class="survey-field">
-                                <label for="birthDate" class="form-label">Дата рождения</label>
-                                <InputDate @bind-Value="Input.BirthDate"
-                                           id="birthDate"
-                                           class="form-control" />
-                                <ValidationMessage For="() => Input.BirthDate" class="text-danger" />
-                            </div>
-
-                            <div class="survey-field">
-                                <label for="gender" class="form-label">Пол</label>
-                                <InputText @bind-Value="Input.Gender"
-                                           id="gender"
-                                           class="form-control"
-                                           placeholder="Женский / Мужской" />
-                                <ValidationMessage For="() => Input.Gender" class="text-danger" />
-                            </div>
-
-                            <div class="survey-field survey-field-full">
-                                <label for="city" class="form-label">Город</label>
-                                <InputText @bind-Value="Input.City"
-                                           id="city"
-                                           class="form-control"
-                                           placeholder="Введите город" />
-                                <ValidationMessage For="() => Input.City" class="text-danger" />
+                            <div class="profile-form-section">
+                                <div class="profile-form-section-title">Безопасность</div>
+                                <div class="survey-meta-grid">
+                                    <div class="survey-field survey-field-full">
+                                        <label for="username" class="form-label">Имя пользователя</label>
+                                        <input type="text"
+                                               value="@username"
+                                               id="username"
+                                               class="form-control"
+                                               disabled />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -168,32 +184,66 @@ else
     </div>
 }
 
+<AppModal IsOpen="@showMessageModal"
+          Title="@modalTitle"
+          Message="@modalMessage"
+          Variant="@modalVariant"
+          ConfirmText="ОК"
+          OnConfirm="CloseMessageModal" />
+
+<AppModal IsOpen="@showLeaveModal"
+          Title="Несохранённые изменения"
+          Message="У вас есть несохранённые изменения. Выйти без сохранения?"
+          Variant="danger"
+          ConfirmText="Выйти без сохранения"
+          CancelText="Остаться"
+          ShowCancel="true"
+          OnConfirm="LeaveWithoutSaving"
+          OnCancel="StayOnPage" />
+
+<AppModal IsOpen="@showRemovePhotoModal"
+          Title="Удаление фото"
+          Message="Вы уверены, что хотите удалить фото профиля?"
+          Variant="danger"
+          ConfirmText="Удалить"
+          CancelText="Отмена"
+          ShowCancel="true"
+          OnConfirm="ConfirmRemovePhoto"
+          OnCancel="CloseRemovePhotoModal" />
+
 @code {
     private const long MaxPhotoSize = 2 * 1024 * 1024;
 
     private ApplicationUser? user;
     private UserProfile? profile;
+    private EditContext editContext = default!;
 
     private string? username;
     private string? email;
     private string? phoneNumber;
 
     private bool isLoading = true;
-    private string? successMessage;
-    private string? errorMessage;
+    private bool hasUnsavedChanges;
+    private string? pendingNavigationUrl;
+
+    private bool showMessageModal;
+    private bool showLeaveModal;
+    private bool showRemovePhotoModal;
+    private string modalTitle = "Уведомление";
+    private string modalMessage = string.Empty;
+    private string modalVariant = "primary";
 
     private InputModel Input { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
     {
+        editContext = new EditContext(Input);
         await LoadProfileAsync();
     }
 
     private async Task LoadProfileAsync()
     {
         isLoading = true;
-        errorMessage = null;
-        successMessage = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var currentUser = authState.User;
@@ -231,17 +281,18 @@ else
 
             DbContext.UserProfiles.Add(profile);
             await DbContext.SaveChangesAsync();
-
             user.UserProfile = profile;
         }
 
-        Input.PhoneNumber = phoneNumber;
+        Input.PhoneNumber = NormalizePhone(phoneNumber);
         Input.FirstName = profile.FirstName;
         Input.LastName = profile.LastName;
         Input.BirthDate = profile.BirthDate;
-        Input.Gender = profile.Gender;
+        Input.Gender = NormalizeGender(profile.Gender);
         Input.City = profile.City;
 
+        editContext = new EditContext(Input);
+        hasUnsavedChanges = false;
         isLoading = false;
     }
 
@@ -249,9 +300,6 @@ else
     {
         try
         {
-            errorMessage = null;
-            successMessage = null;
-
             if (user is null || profile is null)
                 return;
 
@@ -259,13 +307,13 @@ else
 
             if (file.Size > MaxPhotoSize)
             {
-                errorMessage = "Размер фотографии не должен превышать 2 МБ.";
+                ShowMessage("Ошибка загрузки", "Размер фотографии не должен превышать 2 МБ.", "danger");
                 return;
             }
 
             if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                errorMessage = "Можно загружать только изображения.";
+                ShowMessage("Ошибка загрузки", "Можно загружать только изображения.", "danger");
                 return;
             }
 
@@ -280,23 +328,27 @@ else
             DbContext.UserProfiles.Update(profile);
             await DbContext.SaveChangesAsync();
 
-            successMessage = "Фотография профиля сохранена.";
+            ShowMessage("Фото обновлено", "Фотография профиля сохранена.", "success");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при загрузке фотографии: {ex.Message}";
+            ShowMessage("Ошибка загрузки", $"Ошибка при загрузке фотографии: {ex.Message}", "danger");
         }
     }
 
-    private async Task ConfirmAndRemovePhoto()
+    private void OpenRemovePhotoModal()
     {
-        var confirmed = await JSRuntime.InvokeAsync<bool>(
-            "confirm",
-            "Вы уверены, что хотите удалить фото профиля?");
+        showRemovePhotoModal = true;
+    }
 
-        if (!confirmed)
-            return;
+    private void CloseRemovePhotoModal()
+    {
+        showRemovePhotoModal = false;
+    }
 
+    private async Task ConfirmRemovePhoto()
+    {
+        showRemovePhotoModal = false;
         await RemovePhoto();
     }
 
@@ -304,9 +356,6 @@ else
     {
         try
         {
-            errorMessage = null;
-            successMessage = null;
-
             if (user is null || profile is null)
                 return;
 
@@ -316,11 +365,11 @@ else
             DbContext.UserProfiles.Update(profile);
             await DbContext.SaveChangesAsync();
 
-            successMessage = "Фотография профиля удалена.";
+            ShowMessage("Фото удалено", "Фотография профиля удалена.", "success");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при удалении фотографии: {ex.Message}";
+            ShowMessage("Ошибка удаления", $"Ошибка при удалении фотографии: {ex.Message}", "danger");
         }
     }
 
@@ -328,9 +377,6 @@ else
     {
         try
         {
-            errorMessage = null;
-            successMessage = null;
-
             if (user is null || profile is null)
                 return;
 
@@ -342,7 +388,7 @@ else
 
                 if (!setPhoneResult.Succeeded)
                 {
-                    errorMessage = "Ошибка: не удалось сохранить номер телефона.";
+                    ShowMessage("Ошибка сохранения", "Не удалось сохранить номер телефона.", "danger");
                     return;
                 }
 
@@ -358,21 +404,99 @@ else
             DbContext.UserProfiles.Update(profile);
             await DbContext.SaveChangesAsync();
 
-            successMessage = "Профиль успешно обновлён.";
+            hasUnsavedChanges = false;
+            ShowMessage("Профиль сохранён", "Профиль успешно обновлён.", "success");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при сохранении профиля: {ex.Message}";
+            ShowMessage("Ошибка сохранения", $"Ошибка при сохранении профиля: {ex.Message}", "danger");
         }
+    }
+
+    private void OnInvalidSubmit(EditContext context)
+    {
+        var firstError = context.GetValidationMessages().FirstOrDefault()
+            ?? "Проверьте корректность заполнения полей.";
+
+        ShowMessage("Проверьте данные", firstError, "danger");
     }
 
     private void NormalizeInput()
     {
-        Input.PhoneNumber = NormalizeSpaces(Input.PhoneNumber);
+        Input.PhoneNumber = NormalizePhone(Input.PhoneNumber);
         Input.FirstName = NormalizeSpaces(Input.FirstName);
         Input.LastName = NormalizeSpaces(Input.LastName);
-        Input.Gender = NormalizeSpaces(Input.Gender);
+        Input.Gender = NormalizeGender(Input.Gender);
         Input.City = NormalizeSpaces(Input.City);
+    }
+
+    private void MarkDirty()
+    {
+        hasUnsavedChanges = true;
+    }
+
+    private void EnsurePhonePrefix()
+    {
+        if (string.IsNullOrWhiteSpace(Input.PhoneNumber))
+        {
+            Input.PhoneNumber = "+7";
+            hasUnsavedChanges = true;
+        }
+    }
+
+    private void OnPhoneInput(ChangeEventArgs e)
+    {
+        Input.PhoneNumber = NormalizePhoneInput(e.Value?.ToString());
+        hasUnsavedChanges = true;
+    }
+
+    private void OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (!hasUnsavedChanges || showLeaveModal)
+            return;
+
+        pendingNavigationUrl = context.TargetLocation;
+        context.PreventNavigation();
+        showLeaveModal = true;
+    }
+
+    private void StayOnPage()
+    {
+        pendingNavigationUrl = null;
+        showLeaveModal = false;
+    }
+
+    private void LeaveWithoutSaving()
+    {
+        showLeaveModal = false;
+        hasUnsavedChanges = false;
+
+        if (!string.IsNullOrWhiteSpace(pendingNavigationUrl))
+        {
+            NavigationManager.NavigateTo(pendingNavigationUrl);
+        }
+    }
+
+    private void ShowMessage(string title, string message, string variant)
+    {
+        modalTitle = title;
+        modalMessage = message;
+        modalVariant = variant;
+        showMessageModal = true;
+    }
+
+    private void CloseMessageModal()
+    {
+        showMessageModal = false;
+    }
+
+    private bool IsFieldInvalid(string fieldName)
+    {
+        if (editContext is null)
+            return false;
+
+        var fieldIdentifier = new FieldIdentifier(Input, fieldName);
+        return editContext.GetValidationMessages(fieldIdentifier).Any();
     }
 
     private static string? NormalizeSpaces(string? value)
@@ -381,6 +505,46 @@ else
             return null;
 
         return Regex.Replace(value.Trim(), @"\s+", " ");
+    }
+
+    private static string? NormalizeGender(string? value)
+    {
+        return value is "Мужской" or "Женский" ? value : null;
+    }
+
+    private static string? NormalizePhone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var digits = Regex.Replace(value, @"\D", "");
+
+        if (digits.StartsWith("8") && digits.Length == 11)
+            digits = "7" + digits[1..];
+
+        if (digits.StartsWith("7") && digits.Length == 11)
+            return "+" + digits;
+
+        return value.Trim();
+    }
+
+    private static string NormalizePhoneInput(string? value)
+    {
+        var digits = Regex.Replace(value ?? string.Empty, @"\D", "");
+
+        if (string.IsNullOrWhiteSpace(digits))
+            return "+7";
+
+        if (digits.StartsWith("8"))
+            digits = "7" + digits[1..];
+
+        if (!digits.StartsWith("7"))
+            digits = "7" + digits;
+
+        if (digits.Length > 11)
+            digits = digits[..11];
+
+        return "+" + digits;
     }
 
     private string? GetPhotoSrc()
@@ -408,7 +572,7 @@ else
 
     private sealed class InputModel : IValidatableObject
     {
-        [RegularExpression(@"^(\+7|8)\d{10}$", ErrorMessage = "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.")]
+        [RegularExpression(@"^\+7\d{10}$", ErrorMessage = "Телефон должен быть в формате +7XXXXXXXXXX.")]
         [Display(Name = "Телефон")]
         public string? PhoneNumber { get; set; }
 
@@ -422,8 +586,7 @@ else
 
         public DateTime? BirthDate { get; set; }
 
-        [StringLength(50, ErrorMessage = "Пол не должен превышать 50 символов.")]
-        [RegularExpression(@"^[А-Яа-яЁёA-Za-z\- ]+$", ErrorMessage = "Пол может содержать только буквы, пробелы и дефис.")]
+        [RegularExpression(@"^(Мужской|Женский)?$", ErrorMessage = "Выберите значение пола из списка.")]
         public string? Gender { get; set; }
 
         [StringLength(100, ErrorMessage = "Город не должен превышать 100 символов.")]

@@ -15,6 +15,8 @@
 
 <PageTitle>Создание опроса</PageTitle>
 
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
 <div class="survey-editor-page">
     <div class="survey-page-header">
         <div>
@@ -31,22 +33,22 @@
         <div class="survey-meta-grid">
             <div class="survey-field survey-field-full">
                 <label class="form-label">Название опроса</label>
-                <input class="form-control" @bind="model.Title" placeholder="Введите название опроса" />
+                <input class="form-control" @bind="model.Title" @oninput="MarkDirty" placeholder="Введите название опроса" />
             </div>
 
             <div class="survey-field survey-field-full">
                 <label class="form-label">Описание</label>
-                <textarea class="form-control" rows="4" @bind="model.Description" placeholder="Кратко опишите цель опроса"></textarea>
+                <textarea class="form-control" rows="4" @bind="model.Description" @oninput="MarkDirty" placeholder="Кратко опишите цель опроса"></textarea>
             </div>
 
             <div class="survey-field">
                 <label class="form-label">Дата начала</label>
-                <InputDate @bind-Value="startDate" class="form-control" />
+                <InputDate @bind-Value="startDate" @bind-Value:after="MarkDirty" class="form-control" />
             </div>
 
             <div class="survey-field">
                 <label class="form-label">Дата окончания</label>
-                <InputDate @bind-Value="endDate" class="form-control" />
+                <InputDate @bind-Value="endDate" @bind-Value:after="MarkDirty" class="form-control" />
             </div>
 
             <div class="survey-options-row survey-field-full">
@@ -316,15 +318,6 @@
         }
     </section>
 
-    @if (!string.IsNullOrEmpty(successMessage))
-    {
-        <div class="alert alert-success">@successMessage</div>
-    }
-
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
     <div class="survey-bottom-actions survey-bottom-actions-inline">
         <div class="survey-bottom-actions-left">
             <button type="button" class="btn btn-secondary" @onclick="AddQuestion">
@@ -520,15 +513,34 @@
     </div>
 }
 
+<AppModal IsOpen="@(!string.IsNullOrEmpty(errorMessage))"
+          Title="Проверьте опрос"
+          Message="@(errorMessage ?? string.Empty)"
+          Variant="danger"
+          ConfirmText="ОК"
+          OnConfirm="ClearEditorMessage" />
+
+<AppModal IsOpen="@showLeaveModal"
+          Title="Несохранённые изменения"
+          Message="У вас есть несохранённые изменения. Выйти без сохранения?"
+          Variant="danger"
+          ConfirmText="Выйти без сохранения"
+          CancelText="Остаться"
+          ShowCancel="true"
+          OnConfirm="LeaveWithoutSaving"
+          OnCancel="StayOnPage" />
+
 @code {
     private const long MaxFileSize = 2 * 1024 * 1024;
 
     private CreateSurveyDto model = new();
     private DateTime? startDate;
     private DateTime? endDate;
-    private string? successMessage;
     private string? errorMessage;
     private bool isSaving;
+    private bool hasUnsavedChanges;
+    private bool showLeaveModal;
+    private string? pendingNavigationUrl;
 
     private List<QuestionBankItemDto> questionBankItems = new();
     private List<string> questionBankCategories = new();
@@ -684,7 +696,7 @@
     private void AddQuestion()
     {
         errorMessage = null;
-        successMessage = null;
+        hasUnsavedChanges = true;
 
         model.Questions.Add(new CreateQuestionDto
         {
@@ -700,12 +712,12 @@
     private void RemoveQuestion(int index)
     {
         errorMessage = null;
-        successMessage = null;
 
         if (index >= 0 && index < model.Questions.Count)
         {
             model.Questions.RemoveAt(index);
             RecalculateQuestionOrders();
+            hasUnsavedChanges = true;
         }
     }
 
@@ -718,6 +730,7 @@
         model.Questions.RemoveAt(index);
         model.Questions.Insert(index - 1, item);
         RecalculateQuestionOrders();
+        hasUnsavedChanges = true;
     }
 
     private void MoveQuestionDown(int index)
@@ -729,6 +742,7 @@
         model.Questions.RemoveAt(index);
         model.Questions.Insert(index + 1, item);
         RecalculateQuestionOrders();
+        hasUnsavedChanges = true;
     }
 
     private void RecalculateQuestionOrders()
@@ -748,6 +762,7 @@
         {
             Order = question.Options.Count + 1
         });
+        hasUnsavedChanges = true;
     }
 
     private void RemoveOption(CreateQuestionDto question, int index)
@@ -756,6 +771,7 @@
         {
             question.Options.RemoveAt(index);
             RecalculateOptionOrders(question);
+            hasUnsavedChanges = true;
         }
     }
 
@@ -809,6 +825,7 @@
             await stream.CopyToAsync(memoryStream);
 
             question.Image = memoryStream.ToArray();
+            hasUnsavedChanges = true;
         }
         catch (Exception ex)
         {
@@ -842,6 +859,7 @@
     private void OnQuestionTypeChanged(CreateQuestionDto question, string? newValue)
     {
         question.QuestionType = newValue ?? string.Empty;
+        hasUnsavedChanges = true;
 
         if (question.QuestionType == "YesNo")
         {
@@ -904,7 +922,6 @@
         try
         {
             isSaving = true;
-            successMessage = null;
             errorMessage = null;
 
             if (string.IsNullOrWhiteSpace(model.Title))
@@ -1024,6 +1041,7 @@
             var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
             await SurveyService.CreateSurveyAsync(model, userId);
+            hasUnsavedChanges = false;
             NavigationManager.NavigateTo("/admin?message=saved");
         }
         catch (Exception ex)
@@ -1035,4 +1053,40 @@
             isSaving = false;
         }
     }
+
+    private void MarkDirty()
+    {
+        hasUnsavedChanges = true;
+    }
+
+    private void ClearEditorMessage()
+    {
+        errorMessage = null;
+    }
+
+    private void OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (!hasUnsavedChanges || showLeaveModal)
+            return;
+
+        pendingNavigationUrl = context.TargetLocation;
+        context.PreventNavigation();
+        showLeaveModal = true;
+    }
+
+    private void StayOnPage()
+    {
+        pendingNavigationUrl = null;
+        showLeaveModal = false;
+    }
+
+    private void LeaveWithoutSaving()
+    {
+        showLeaveModal = false;
+        hasUnsavedChanges = false;
+
+        if (!string.IsNullOrWhiteSpace(pendingNavigationUrl))
+            NavigationManager.NavigateTo(pendingNavigationUrl);
+    }
 }
+

@@ -116,7 +116,7 @@
                                             <tr>
                                                 <td>@item.Text</td>
                                                 <td>@GetQuestionTypeLabel(item.QuestionType)</td>
-                                                <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                                <td>@DateTimeDisplay.Date(item.CreatedAt)</td>
                                                 <td class="question-bank-actions-cell">
                                                     <button class="btn btn-success btn-sm"
                                                             @onclick="() => Edit(item.Id)">

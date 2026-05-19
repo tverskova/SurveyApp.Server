@@ -182,12 +182,12 @@
 
     private static string FormatDate(DateTime? date)
     {
-        return date.HasValue ? date.Value.ToString("dd.MM.yyyy") : "Не указано";
+        return DateTimeDisplay.Date(date);
     }
 
     private static string FormatDateTime(DateTime? date)
     {
-        return date.HasValue ? date.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-";
+        return date.HasValue ? DateTimeDisplay.DateTime(date) : "-";
     }
 
     private static string GetQuestionTypeLabel(string questionType)
