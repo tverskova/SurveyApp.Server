@@ -16,6 +16,8 @@
 
 <PageTitle>Прохождение опроса</PageTitle>
 
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
 @if (isLoading)
 {
     <div class="d-flex justify-content-center my-5">
@@ -170,14 +172,16 @@ else
                     <textarea class="form-control"
                               rows="4"
                               placeholder="Введите ваш ответ"
-                              @bind="textAnswers[question.Id]"></textarea>
+                              @bind="textAnswers[question.Id]"
+                              @bind:after="() => MarkQuestionAnswered(question.Id)"></textarea>
                 }
                 else if (question.QuestionType == "Number")
                 {
                     <input class="form-control"
                            type="number"
                            placeholder="Введите число"
-                           @bind="numberAnswers[question.Id]" />
+                           @bind="numberAnswers[question.Id]"
+                           @bind:after="() => MarkQuestionAnswered(question.Id)" />
                 }
                 else if (question.QuestionType == "Rating")
                 {
@@ -223,7 +227,7 @@ else
                                    type="radio"
                                    name="@($"yesno_{question.Id}")"
                                    checked="@(yesNoAnswers[question.Id] == true)"
-                                   @onchange="() => yesNoAnswers[question.Id] = true" />
+                                   @onchange="() => SetYesNo(question.Id, true)" />
                             <label class="form-check-label">Да</label>
                         </div>
 
@@ -232,7 +236,7 @@ else
                                    type="radio"
                                    name="@($"yesno_{question.Id}")"
                                    checked="@(yesNoAnswers[question.Id] == false)"
-                                   @onchange="() => yesNoAnswers[question.Id] = false" />
+                                   @onchange="() => SetYesNo(question.Id, false)" />
                             <label class="form-check-label">Нет</label>
                         </div>
                     </div>
@@ -267,6 +271,16 @@ else
           ConfirmText="ОК"
           OnConfirm="CloseSurveyModal" />
 
+<AppModal IsOpen="@showLeaveModal"
+          Title="Выход из опроса"
+          Message="Вы уверены, что хотите выйти? Введённые ответы не сохранятся."
+          Variant="danger"
+          ConfirmText="Выйти без сохранения"
+          CancelText="Остаться"
+          ShowCancel="true"
+          OnConfirm="LeaveWithoutSaving"
+          OnCancel="StayOnSurvey" />
+
 @code {
     [Parameter]
     public int Id { get; set; }
@@ -279,6 +293,9 @@ else
     private string? errorMessage;
     private bool redirectAfterModal;
     private bool showSurveyModal;
+    private bool showLeaveModal;
+    private bool hasUnsavedAnswers;
+    private string? pendingNavigationUrl;
     private string modalTitle = "Уведомление";
     private string modalMessage = string.Empty;
     private string modalVariant = "primary";
@@ -346,7 +363,7 @@ else
     private void SetSingleChoice(int questionId, int optionId)
     {
         singleChoiceAnswers[questionId] = optionId;
-        missingRequiredQuestionIds.Remove(questionId);
+        MarkQuestionAnswered(questionId);
     }
 
     private bool IsMultipleChoiceSelected(int questionId, int optionId)
@@ -366,6 +383,8 @@ else
 
         if (multipleChoiceAnswers[questionId].Count > 0)
             missingRequiredQuestionIds.Remove(questionId);
+
+        hasUnsavedAnswers = true;
     }
 
     private void OnRatingChanging(int questionId, string? value)
@@ -373,8 +392,20 @@ else
         if (int.TryParse(value, out var parsed))
         {
             tempRatingAnswers[questionId] = parsed;
-            missingRequiredQuestionIds.Remove(questionId);
+            MarkQuestionAnswered(questionId);
         }
+    }
+
+    private void SetYesNo(int questionId, bool value)
+    {
+        yesNoAnswers[questionId] = value;
+        MarkQuestionAnswered(questionId);
+    }
+
+    private void MarkQuestionAnswered(int questionId)
+    {
+        missingRequiredQuestionIds.Remove(questionId);
+        hasUnsavedAnswers = true;
     }
 
     private string GetSliderStyle(int questionId, int min, int max)
@@ -476,6 +507,7 @@ else
                 return;
             }
 
+            hasUnsavedAnswers = false;
             redirectAfterModal = true;
             ShowSurveyModal("Опрос пройден", "Ответы успешно отправлены. Спасибо за прохождение опроса", "success");
         }
@@ -517,8 +549,32 @@ else
 
         if (redirectAfterModal)
         {
+            hasUnsavedAnswers = false;
             NavigationManager.NavigateTo("/user-home");
         }
+    }
+
+    private void OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (!hasUnsavedAnswers || showLeaveModal || redirectAfterModal)
+            return;
+
+        pendingNavigationUrl = context.TargetLocation;
+        context.PreventNavigation();
+        showLeaveModal = true;
+    }
+
+    private void StayOnSurvey()
+    {
+        pendingNavigationUrl = null;
+        showLeaveModal = false;
+    }
+
+    private void LeaveWithoutSaving()
+    {
+        showLeaveModal = false;
+        hasUnsavedAnswers = false;
+        NavigationManager.NavigateTo(string.IsNullOrWhiteSpace(pendingNavigationUrl) ? "/user-home" : pendingNavigationUrl);
     }
 
     private static string GetQuestionElementId(int questionId)

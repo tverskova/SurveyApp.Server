@@ -4,6 +4,7 @@
 @using System.Text
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.WebUtilities
 @using SurveyApp.Server.Data
 
@@ -25,14 +26,10 @@
                 <p class="auth-subtitle">Создайте новую учётную запись для работы в системе</p>
             </div>
 
-            <StatusMessage Message="@Message" />
-
-            <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register" class="auth-form">
+            <EditForm EditContext="editContext" method="post" OnSubmit="RegisterUser" FormName="register" class="auth-form">
                 <DataAnnotationsValidator />
 
-                <ValidationSummary class="text-danger mb-3" role="alert" />
-
-                <div class="auth-field">
+                <div class="auth-field @(IsFieldInvalid(nameof(Input.Email)) ? "profile-field-invalid" : "")">
                     <label for="Input.Email" class="form-label">Электронная почта</label>
                     <InputText @bind-Value="Input.Email"
                                id="Input.Email"
@@ -43,7 +40,7 @@
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
 
-                <div class="auth-field">
+                <div class="auth-field @(IsFieldInvalid(nameof(Input.Password)) ? "profile-field-invalid" : "")">
                     <label for="Input.Password" class="form-label">Пароль</label>
                     <div class="password-input-wrap">
                         <InputText type="password"
@@ -53,14 +50,12 @@
                                    autocomplete="new-password"
                                    aria-required="true"
                                    placeholder="Введите пароль" />
-                        <button type="button" class="password-toggle-btn" data-password-toggle="Input.Password" aria-label="Показать пароль">
-                            Показать
-                        </button>
+                        <button type="button" class="password-toggle-btn" data-password-toggle="Input.Password" aria-label="Показать пароль" hidden></button>
                     </div>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
 
-                <div class="auth-field">
+                <div class="auth-field @(IsFieldInvalid(nameof(Input.ConfirmPassword)) ? "profile-field-invalid" : "")">
                     <label for="Input.ConfirmPassword" class="form-label">Подтверждение пароля</label>
                     <div class="password-input-wrap">
                         <InputText type="password"
@@ -70,9 +65,7 @@
                                    autocomplete="new-password"
                                    aria-required="true"
                                    placeholder="Повторите пароль" />
-                        <button type="button" class="password-toggle-btn" data-password-toggle="Input.ConfirmPassword" aria-label="Показать пароль">
-                            Показать
-                        </button>
+                        <button type="button" class="password-toggle-btn" data-password-toggle="Input.ConfirmPassword" aria-label="Показать пароль" hidden></button>
                     </div>
                     <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
                 </div>
@@ -96,7 +89,8 @@
 </div>
 
 @code {
-    private IEnumerable<IdentityError>? identityErrors;
+    private EditContext editContext = default!;
+    private ValidationMessageStore? messageStore;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -104,17 +98,21 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null
-        ? null
-        : $"Ошибка: {string.Join(", ", identityErrors.Select(error => error.Description))}";
-
     protected override void OnInitialized()
     {
         Input ??= new();
+        editContext = new EditContext(Input);
+        messageStore = new ValidationMessageStore(editContext);
     }
 
-    public async Task RegisterUser(EditContext editContext)
+    public async Task RegisterUser()
     {
+        messageStore?.Clear();
+        editContext.NotifyValidationStateChanged();
+
+        if (!editContext.Validate())
+            return;
+
         var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
@@ -125,14 +123,14 @@
 
         if (!result.Succeeded)
         {
-            identityErrors = result.Errors;
+            AddIdentityErrors(result.Errors);
             return;
         }
 
         var roleResult = await UserManager.AddToRoleAsync(user, "User");
         if (!roleResult.Succeeded)
         {
-            identityErrors = roleResult.Errors;
+            AddIdentityErrors(roleResult.Errors);
             return;
         }
 
@@ -157,6 +155,37 @@
 
         await SignInManager.SignInAsync(user, isPersistent: false);
         RedirectManager.RedirectTo("/redirect-by-role");
+    }
+
+    private void AddIdentityErrors(IEnumerable<IdentityError> errors)
+    {
+        if (messageStore is null)
+            return;
+
+        foreach (var error in errors)
+        {
+            var targetField = IsEmailError(error.Description)
+                ? nameof(Input.Email)
+                : nameof(Input.Password);
+
+            messageStore.Add(new FieldIdentifier(Input, targetField), error.Description);
+        }
+
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private static bool IsEmailError(string error)
+    {
+        return error.Contains("email", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("почт", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("адрес", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("пользовател", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsFieldInvalid(string fieldName)
+    {
+        var fieldIdentifier = new FieldIdentifier(Input, fieldName);
+        return editContext.GetValidationMessages(fieldIdentifier).Any();
     }
 
     private ApplicationUser CreateUser()

@@ -8,7 +8,6 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
-@using Microsoft.JSInterop
 @using SurveyApp.Server.Data
 
 @attribute [Authorize]
@@ -17,7 +16,6 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ApplicationDbContext DbContext
 @inject NavigationManager NavigationManager
-@inject IJSRuntime JSRuntime
 
 <PageTitle>Личный кабинет</PageTitle>
 
@@ -84,6 +82,15 @@ else
                                         <ValidationMessage For="() => Input.FirstName" class="text-danger" />
                                     </div>
 
+                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.BirthDate)) ? "profile-field-invalid" : "")">
+                                        <label for="birthDate" class="form-label">Дата рождения</label>
+                                        <InputDate @bind-Value="Input.BirthDate"
+                                                   @bind-Value:after="MarkDirty"
+                                                   id="birthDate"
+                                                   class="form-control" />
+                                        <ValidationMessage For="() => Input.BirthDate" class="text-danger" />
+                                    </div>
+
                                     <div class="survey-field @(IsFieldInvalid(nameof(Input.LastName)) ? "profile-field-invalid" : "")">
                                         <label for="lastName" class="form-label">Фамилия</label>
                                         <InputText @bind-Value="Input.LastName"
@@ -92,15 +99,6 @@ else
                                                    placeholder="Введите фамилию"
                                                    @oninput="MarkDirty" />
                                         <ValidationMessage For="() => Input.LastName" class="text-danger" />
-                                    </div>
-
-                                    <div class="survey-field @(IsFieldInvalid(nameof(Input.BirthDate)) ? "profile-field-invalid" : "")">
-                                        <label for="birthDate" class="form-label">Дата рождения</label>
-                                        <InputDate @bind-Value="Input.BirthDate"
-                                                   @bind-Value:after="MarkDirty"
-                                                   id="birthDate"
-                                                   class="form-control" />
-                                        <ValidationMessage For="() => Input.BirthDate" class="text-danger" />
                                     </div>
 
                                     <div class="survey-field @(IsFieldInvalid(nameof(Input.Gender)) ? "profile-field-invalid" : "")">

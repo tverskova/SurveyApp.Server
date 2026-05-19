@@ -274,6 +274,26 @@ input[type="date"] {
     color: #111827;
 }
 
+.form-control.invalid,
+.form-select.invalid,
+.form-control.input-validation-error,
+.form-select.input-validation-error,
+.input-validation-error {
+    border-color: #DC2626 !important;
+    background-color: #FFFFFF !important;
+    box-shadow: none;
+}
+
+.form-control.invalid:focus,
+.form-select.invalid:focus,
+.form-control.input-validation-error:focus,
+.form-select.input-validation-error:focus,
+.input-validation-error:focus {
+    border-color: #DC2626 !important;
+    background-color: #FFFFFF !important;
+    box-shadow: 0 0 0 0.18rem rgba(220, 38, 38, 0.12);
+}
+
     .form-control:hover,
     .form-select:hover,
     textarea:hover,
@@ -722,7 +742,7 @@ input[type="date"] {
 }
 
 .password-input-wrap .form-control {
-    padding-right: 5.5rem;
+    padding-right: 2.75rem;
 }
 
 .password-toggle-btn {
@@ -732,19 +752,38 @@ input[type="date"] {
     transform: translateY(-50%);
     border: 0;
     background: transparent;
-    color: #2F80ED;
-    font-weight: 700;
-    font-size: 0.84rem;
-    padding: 0.25rem 0.35rem;
+    color: #64748B;
+    width: 2rem;
+    height: 2rem;
+    padding: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
 }
 
 .password-toggle-btn:hover {
-    color: #1F6FE0;
+    color: #2F80ED;
+    background: #F3F8FF;
+}
+
+.password-toggle-btn svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.password-toggle-btn[hidden] {
+    display: none;
 }
 
 .available-survey-filters {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) 190px 190px 190px;
+    grid-template-columns: minmax(260px, 1fr) 190px;
     gap: 0.9rem;
     align-items: end;
 }
@@ -799,12 +838,14 @@ input[type="date"] {
 .question-required-missing {
     border: 1px solid #F8C7C1 !important;
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+    background: #FFFFFF !important;
 }
 
 .question-required-missing .form-control,
 .profile-field-invalid .form-control,
 .profile-field-invalid .form-select {
     border-color: #DC2626;
+    background-color: #FFFFFF !important;
 }
 
 .profile-form-sections {

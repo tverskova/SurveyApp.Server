@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Forms
 @using SurveyApp.Server.Data
 
 @inject UserManager<ApplicationUser> UserManager
@@ -21,14 +22,10 @@
                 <p class="auth-subtitle">Войдите в систему, чтобы продолжить работу</p>
             </div>
 
-            <StatusMessage Message="@errorMessage" />
-
             <EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login" class="auth-form">
                 <DataAnnotationsValidator />
 
-                <ValidationSummary class="text-danger mb-3" role="alert" />
-
-                <div class="auth-field">
+                <div class="auth-field @(IsFieldInvalid(nameof(Input.Email)) ? "profile-field-invalid" : "")">
                     <label for="Input.Email" class="form-label">Электронная почта</label>
                     <InputText @bind-Value="Input.Email"
                                id="Input.Email"
@@ -39,7 +36,7 @@
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
 
-                <div class="auth-field">
+                <div class="auth-field @(IsFieldInvalid(nameof(Input.Password)) ? "profile-field-invalid" : "")">
                     <label for="Input.Password" class="form-label">Пароль</label>
                     <div class="password-input-wrap">
                         <InputText type="password"
@@ -52,9 +49,8 @@
                         <button type="button"
                                 class="password-toggle-btn"
                                 data-password-toggle="Input.Password"
-                                aria-label="Показать пароль">
-                            Показать
-                        </button>
+                                aria-label="Показать пароль"
+                                hidden></button>
                     </div>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
@@ -81,8 +77,8 @@
 </div>
 
 @code {
-    private string? errorMessage;
     private EditContext editContext = default!;
+    private ValidationMessageStore? messageStore;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -97,6 +93,7 @@
     {
         Input ??= new();
         editContext = new EditContext(Input);
+        messageStore = new ValidationMessageStore(editContext);
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
@@ -106,9 +103,12 @@
 
     public async Task LoginUser()
     {
+        messageStore?.Clear();
+        editContext.NotifyValidationStateChanged();
+
         if (!string.IsNullOrEmpty(Input.Passkey?.Error))
         {
-            errorMessage = $"Ошибка: {Input.Passkey.Error}";
+            AddFieldError(nameof(Input.Password), $"Ошибка: {Input.Passkey.Error}");
             return;
         }
 
@@ -145,8 +145,24 @@
         }
         else
         {
-            errorMessage = "Ошибка: неверная попытка входа.";
+            AddFieldError(nameof(Input.Password), "Неверная электронная почта или пароль.");
         }
+    }
+
+    private void AddFieldError(string fieldName, string message)
+    {
+        if (messageStore is null)
+            return;
+
+        messageStore.Clear();
+        messageStore.Add(new FieldIdentifier(Input, fieldName), message);
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private bool IsFieldInvalid(string fieldName)
+    {
+        var fieldIdentifier = new FieldIdentifier(Input, fieldName);
+        return editContext.GetValidationMessages(fieldIdentifier).Any();
     }
 
     private sealed class InputModel
